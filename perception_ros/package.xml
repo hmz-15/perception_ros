@@ -8,6 +8,7 @@
   <!-- Example:  -->
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
   <maintainer email="zeyu@todo.todo">zeyu</maintainer>
+  <maintainer email="muzhi@todo.todo">muzhi</maintainer>
 
 
   <!-- One license tag required, multiple allowed, one license per tag -->
@@ -62,7 +63,6 @@
   <build_depend>pcl_ros</build_depend>
   <build_depend>pcl_conversions</build_depend>
   <build_depend>approxmvbb_catkin</build_depend>
-  <build_depend>pg_map_ros</build_depend>
   <build_depend>pcl_catkin</build_depend>
   <build_depend>opencv3_catkin</build_depend>
   
@@ -80,7 +80,6 @@
   <build_export_depend>pcl_ros</build_export_depend>
   <build_export_depend>pcl_conversions</build_export_depend>
   <build_export_depend>approxmvbb_catkin</build_export_depend>
-  <build_export_depend>pg_map_ros</build_export_depend>
   <build_export_depend>pcl_catkin</build_export_depend>
   <build_export_depend>opencv3_catkin</build_export_depend>
   <!-- <build_export_depend>global_segment_map</build_export_depend> -->

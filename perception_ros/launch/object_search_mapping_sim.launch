@@ -10,13 +10,19 @@
   <arg name="rgb_raw_topic" default="camera/rgb/image_raw" />
   <arg name="rgb_info_topic" default="camera/rgb/camera_info" />
   <arg name="depth_raw_topic" default="camera/depth/image_raw" />
-  <arg name="depth_info_topic" default="camera/depth/camera_info" />
+  <arg name="seg_topic" default="camera/seg" />
+  <!-- <arg name="depth_info_topic" default="camera/depth/camera_info" /> -->
 
   <!-- frame parameters -->
   <!-- <arg name="camera_frame" default="camera_link" /> -->
     
   <!-- launch node for generating point cloud segments -->
   <node name="pc_seg_generator_node" pkg="perception_ros" type="pc_seg_generator_node" output="screen" if="$(arg pub_point_cloud)">
+      <remap from="/perception/rgb_image" to="$(arg rgb_raw_topic)"/>
+      <remap from="/perception/depth_image" to="$(arg depth_raw_topic)"/>
+      <remap from="/perception/rgb_info" to="$(arg rgb_info_topic)"/>
+      <remap from="/perception/seg" to="$(arg seg_topic)"/>
+
       <rosparam command="load" file="$(find perception_ros)/cfg/seg_param.yaml" />
       <param name="use_semantic_segmentation" type="bool" value="$(arg use_semantic_segmentation)" />
       <param name="use_geometric_segmentation" type="bool" value="$(arg use_geometric_segmentation)" />

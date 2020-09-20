@@ -26,7 +26,6 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   pcl_conversions
   approxmvbb_catkin
-  pg_map_ros
   pcl_catkin
   opencv3_catkin
 
@@ -145,7 +144,7 @@ catkin_package(
  INCLUDE_DIRS include include/depth_segmentation
  LIBRARIES {PROJECT_NAME}
  CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs seg_msgs message_filters image_transport tf
- pcl_ros pcl_conversions approxmvbb_catkin pg_map_ros pcl_catkin opencv3_catkin
+ pcl_ros pcl_conversions approxmvbb_catkin pcl_catkin opencv3_catkin
 #  DEPENDS system_lib
 )
 

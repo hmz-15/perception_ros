@@ -1,0 +1,38 @@
+<launch>
+
+  <!-- mode parameters -->
+  <arg name="mapping" default="true" />
+  <arg name="pub_point_cloud" default="true" />
+  <arg name="use_semantic_segmentation" default="true" />
+  <arg name="use_geometric_segmentation" default="false" />
+
+  <!-- topic parameters -->
+  <arg name="rgb_raw_topic" default="camera/rgb/image_raw" />
+  <arg name="rgb_info_topic" default="camera/rgb/camera_info" />
+  <arg name="depth_raw_topic" default="camera/depth/image_raw" />
+  <arg name="depth_info_topic" default="camera/depth/camera_info" />
+
+  <!-- frame parameters -->
+  <!-- <arg name="camera_frame" default="camera_link" /> -->
+    
+  <!-- launch node for generating point cloud segments -->
+  <node name="pc_seg_generator_node" pkg="perception_ros" type="pc_seg_generator_node" output="screen" if="$(arg pub_point_cloud)">
+      <rosparam command="load" file="$(find perception_ros)/cfg/seg_param.yaml" />
+      <param name="use_semantic_segmentation" type="bool" value="$(arg use_semantic_segmentation)" />
+      <param name="use_geometric_segmentation" type="bool" value="$(arg use_geometric_segmentation)" />
+      <param name="use_GT_camera_frame" type="bool" value="true" />
+      <!-- <param name="camera_frame" type="string" value="$(arg camera_frame)" /> -->
+      <param name="geo_seg_mode" type="int" value="0" />  <!--0 for depth and 1 for point cloud-->>
+      <param name="visualize_geo_seg" type="bool" value="false" />
+      <param name="pub_seg_img" type="bool" value="true" />
+      <param name="save_img" type="bool" value="false" />
+  </node>
+
+  <!-- launch node for panoptic mapping -->
+  <node name="gsm_node" pkg="gsm_node" type="gsm_node" output="screen" if="$(arg mapping)">
+      <rosparam command="load" file="$(find gsm_node)/cfg/default.yaml" />
+      <rosparam command="load" file="$(find gsm_node)/cfg/TUM1.yaml" />
+      <param name="meshing/visualize" value="true" />
+  </node>
+
+</launch>

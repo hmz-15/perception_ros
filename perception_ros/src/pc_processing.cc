@@ -307,6 +307,9 @@ void PCProcessor::GeneratePCSem (const cv::Mat& imRGB, const cv::Mat& imDepth, c
             }
         }
 
+        std::vector<int> map;
+        pcl::removeNaNFromPointCloud(*(clouds[k]),*(clouds[k]),map);
+
     }
 }
 

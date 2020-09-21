@@ -7,6 +7,7 @@ namespace PerceptionROS
 {
 
 const std::vector<ObjClass> obj_lib = {
+    // rgb color, class id, class name
     {{220, 20, 60}, 0, "Person"}, 
     // {{119, 11, 32}, 1, "bicycle"}, 
     {{250, 0, 30}, 13, "Bench"}, 
@@ -72,6 +73,7 @@ PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handl
     // load rosparam
     node_handle_.param<bool>("use_semantic_segmentation", use_semantic_segmentation, false);
     node_handle_.param<bool>("use_geometric_segmentation", use_geometric_segmentation, false);
+    node_handle_.param<bool>("use_distance_check", use_distance_check, false);
     node_handle_.param<bool>("use_GT_camera_frame", use_GT_camera_frame, true);
     node_handle_.param<std::string>("camera_frame", camera_frame, "camera_link");
     node_handle_.param<int>("geo_seg_mode", geo_seg_mode, 1);
@@ -659,121 +661,124 @@ void PCSegGeneratorNode::LabelPC ()
     }
 
     // Distance check for segments with the same instance id
-    float radius = 0.05;
-    for (auto inst_id_it = id_pc_pairs.begin(); inst_id_it != id_pc_pairs.end(); inst_id_it++)
+    if (use_distance_check)
     {
-        int size = inst_id_it->second.size();
-        if (size > 1)
+        float radius = 0.05;
+        for (auto inst_id_it = id_pc_pairs.begin(); inst_id_it != id_pc_pairs.end(); inst_id_it++)
         {
-            if (verbose)
-                ROS_INFO("Distance check!");
-            
-            std::vector<int> neighbors(size, 0); // Check minimal distance between every two clouds, if smaller than radius, then set as neighbor
-            std::map<int, std::set<int>> neighbor_pairs;
-            std::set<std::set<int>> clusters; // Each cluster includes all pc that are neighbors
-            std::set<int> outlier;
-            std::set<int> inlier; // We assume the only cluster with maximun points is inlier
-            int max_cluster_count = 0;
-
-            // Get all neigbors
-            for (int i = 0; i < size - 1; i++)
-            {
-                pcl::KdTreeFLANN<PointSurfelLabel> kdtree;
-                kdtree.setInputCloud (inst_id_it->second[i]);
-                for (int j = i + 1; j < size; j++)
-                {
-                    std::vector<int> pointIdxRadiusSearch;
-                    std::vector<float> pointRadiusSquaredDistance;
-                    for (int k = 0; k < inst_id_it->second[j]->points.size(); k += 5) // sample points
-                    {
-                        if (kdtree.radiusSearch (inst_id_it->second[j]->points[k], radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
-                        {
-                            neighbors[i] += 1;
-                            neighbors[j] += 1;
-                            
-                            auto it1 = neighbor_pairs.find(i);
-                            auto it2 = neighbor_pairs.find(j);
-                            if (it1 != neighbor_pairs.end())
-                                it1->second.insert(j);
-                            else
-                            {
-                                std::set<int> neighbor_set = {j};
-                                neighbor_pairs.insert(std::make_pair(i,neighbor_set));
-                            }
-                            if (it2 != neighbor_pairs.end())
-                                it2->second.insert(i);
-                            else
-                            {
-                                std::set<int> neighbor_set = {i};
-                                neighbor_pairs.insert(std::make_pair(j,neighbor_set));
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // Cluster the point cloud segments
-            std::set<int> unclustered_set;
-            for (int ii = 0; ii < size; ii++)
-                unclustered_set.insert(ii);   // Fill with 0, 1, ..
-            while (unclustered_set.size() > 0)
-            {
-                int current_segment_index = *(unclustered_set.begin());
-                std::set<int> current_cluster = {current_segment_index};
-                int current_cluster_count = inst_id_it->second[current_segment_index]->size();
-                if (neighbors[current_segment_index] > 0)
-                {   // width-first search
-                    std::set<int> next_check = neighbor_pairs.find(current_segment_index)->second;
-                    while (next_check.size() > 0)
-                    {
-                        int current_check_index = *(next_check.begin());
-                        auto ret = current_cluster.emplace(current_check_index);
-                        if (ret.second)
-                            current_cluster_count += inst_id_it->second[current_check_index]->size();
-
-                        if (neighbors[current_check_index] > 1)
-                        {
-                            std::set<int> future_check = neighbor_pairs.find(current_check_index)->second;
-                            for (auto check_it = future_check.begin(); check_it != future_check.end(); check_it++)
-                            {
-                                if (current_cluster.find(*check_it) == current_cluster.end())
-                                    next_check.emplace(*check_it);
-                            }
-                        }
-                        next_check.erase(next_check.find(current_check_index));
-                    }   
-                }
-                for (auto it = current_cluster.begin(); it != current_cluster.end(); it++)
-                    unclustered_set.erase(unclustered_set.find(*it));
-
-                clusters.insert(current_cluster);  
-                if (current_cluster_count > max_cluster_count)
-                {
-                    max_cluster_count = current_cluster_count;
-                    outlier.insert(inlier.begin(), inlier.end());
-                    inlier = current_cluster;
-                }
-                else
-                    outlier.insert(current_cluster.begin(), current_cluster.end());          
-            }
-            // std::cout << "inlier size++++++++++ " << inlier.size() <<std::endl;
-            // std::cout << "inlier point size++++++++++ " << (inst_id_it->second[*(inlier.begin())]->points.size()) <<std::endl;      
-            
-            // For outlier, assign background label
-            if (clusters.size() > 1)
+            int size = inst_id_it->second.size();
+            if (size > 1)
             {
                 if (verbose)
-                    ROS_INFO("Filter outliers!");
-                for (auto it = outlier.begin(); it != outlier.end(); it++)
+                    ROS_INFO("Distance check!");
+                
+                std::vector<int> neighbors(size, 0); // Check minimal distance between every two clouds, if smaller than radius, then set as neighbor
+                std::map<int, std::set<int>> neighbor_pairs;
+                std::set<std::set<int>> clusters; // Each cluster includes all pc that are neighbors
+                std::set<int> outlier;
+                std::set<int> inlier; // We assume the only cluster with maximun points is inlier
+                int max_cluster_count = 0;
+
+                // Get all neigbors
+                for (int i = 0; i < size - 1; i++)
                 {
-                    for (int p = 0; p < inst_id_it->second[*it]->points.size(); p++)
+                    pcl::KdTreeFLANN<PointSurfelLabel> kdtree;
+                    kdtree.setInputCloud (inst_id_it->second[i]);
+                    for (int j = i + 1; j < size; j++)
                     {
-                        // inst_id_it->second[*it]->points[p].instance_label = 0u;
-                        inst_id_it->second[*it]->points[p].semantic_label = 80u;
+                        std::vector<int> pointIdxRadiusSearch;
+                        std::vector<float> pointRadiusSquaredDistance;
+                        for (int k = 0; k < inst_id_it->second[j]->points.size(); k += 5) // sample points
+                        {
+                            if (kdtree.radiusSearch (inst_id_it->second[j]->points[k], radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
+                            {
+                                neighbors[i] += 1;
+                                neighbors[j] += 1;
+                                
+                                auto it1 = neighbor_pairs.find(i);
+                                auto it2 = neighbor_pairs.find(j);
+                                if (it1 != neighbor_pairs.end())
+                                    it1->second.insert(j);
+                                else
+                                {
+                                    std::set<int> neighbor_set = {j};
+                                    neighbor_pairs.insert(std::make_pair(i,neighbor_set));
+                                }
+                                if (it2 != neighbor_pairs.end())
+                                    it2->second.insert(i);
+                                else
+                                {
+                                    std::set<int> neighbor_set = {i};
+                                    neighbor_pairs.insert(std::make_pair(j,neighbor_set));
+                                }
+                                break;
+                            }
+                        }
                     }
                 }
-            }  
+
+                // Cluster the point cloud segments
+                std::set<int> unclustered_set;
+                for (int ii = 0; ii < size; ii++)
+                    unclustered_set.insert(ii);   // Fill with 0, 1, ..
+                while (unclustered_set.size() > 0)
+                {
+                    int current_segment_index = *(unclustered_set.begin());
+                    std::set<int> current_cluster = {current_segment_index};
+                    int current_cluster_count = inst_id_it->second[current_segment_index]->size();
+                    if (neighbors[current_segment_index] > 0)
+                    {   // width-first search
+                        std::set<int> next_check = neighbor_pairs.find(current_segment_index)->second;
+                        while (next_check.size() > 0)
+                        {
+                            int current_check_index = *(next_check.begin());
+                            auto ret = current_cluster.emplace(current_check_index);
+                            if (ret.second)
+                                current_cluster_count += inst_id_it->second[current_check_index]->size();
+
+                            if (neighbors[current_check_index] > 1)
+                            {
+                                std::set<int> future_check = neighbor_pairs.find(current_check_index)->second;
+                                for (auto check_it = future_check.begin(); check_it != future_check.end(); check_it++)
+                                {
+                                    if (current_cluster.find(*check_it) == current_cluster.end())
+                                        next_check.emplace(*check_it);
+                                }
+                            }
+                            next_check.erase(next_check.find(current_check_index));
+                        }   
+                    }
+                    for (auto it = current_cluster.begin(); it != current_cluster.end(); it++)
+                        unclustered_set.erase(unclustered_set.find(*it));
+
+                    clusters.insert(current_cluster);  
+                    if (current_cluster_count > max_cluster_count)
+                    {
+                        max_cluster_count = current_cluster_count;
+                        outlier.insert(inlier.begin(), inlier.end());
+                        inlier = current_cluster;
+                    }
+                    else
+                        outlier.insert(current_cluster.begin(), current_cluster.end());          
+                }
+                // std::cout << "inlier size++++++++++ " << inlier.size() <<std::endl;
+                // std::cout << "inlier point size++++++++++ " << (inst_id_it->second[*(inlier.begin())]->points.size()) <<std::endl;      
+                
+                // For outlier, assign background label
+                if (clusters.size() > 1)
+                {
+                    if (verbose)
+                        ROS_INFO("Filter outliers!");
+                    for (auto it = outlier.begin(); it != outlier.end(); it++)
+                    {
+                        for (int p = 0; p < inst_id_it->second[*it]->points.size(); p++)
+                        {
+                            // inst_id_it->second[*it]->points[p].instance_label = 0u;
+                            inst_id_it->second[*it]->points[p].semantic_label = 80u;
+                        }
+                    }
+                }  
+            }
         }
     }
         

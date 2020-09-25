@@ -10,7 +10,7 @@
   <!-- topic parameters -->
   <arg name="rgb_raw_topic" default="camera/rgb/image_raw" />
   <arg name="rgb_info_topic" default="camera/rgb/camera_info" />
-  <arg name="depth_raw_topic" default="camera/depth/image_raw" />
+  <arg name="depth_raw_topic" default="camera/depth/image_inverted" />
   <arg name="seg_topic" default="camera/seg" />
   <!-- <arg name="depth_info_topic" default="camera/depth/camera_info" /> -->
 

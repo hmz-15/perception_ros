@@ -8,15 +8,15 @@ namespace PerceptionROS
 
 const std::vector<ObjClass> obj_lib = {
     // rgb color, class id, class name
-    {{220, 20, 60}, 0, "Other"}, 
+    // {{220, 20, 60}, 0, "Other"}, 
     // {{119, 11, 32}, 1, "bicycle"}, 
     {{250, 0, 30}, 1, "Floor"}, 
-    {{255, 179, 240}, 2, "Robot_part"},
+    // {{255, 179, 240}, 2, "Robot_part"},
     // {{209, 0, 151}, 26, "handbag"}, 
     // {{0, 220, 176}, 28, "suitcase"}, 
     {{197, 226, 255}, 3, "Wall"}, 
     // {{171, 134, 1}, 40, "wine glass"}, 
-    {{109, 63, 54}, 4, "Joint"}, 
+    // {{109, 63, 54}, 4, "Joint"}, 
     // {{84, 105, 51}, 45, "bowl"}, 
     {{153, 69, 1}, 5, "Interactable"}, 
     {{3, 95, 161}, 6, "Cupboard"}, 

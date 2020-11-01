@@ -25,10 +25,10 @@
         <param name="use_vrep" type="bool" value="$(arg use_vrep)"/>
         <!-- <param name="check_dynamic" type="bool" value="$(arg check_dynamic)"/> -->
         <param name="enable_openpose" type="bool" value="$(arg enable_openpose)" />
-        <param name="openpose_ip" type="str" value="192.168.1.121"/>
+        <param name="openpose_ip" type="str" value="192.168.1.139"/>
         <param name="openpose_port" type="int" value="8800"/>
         <param name="enable_detectron" type="bool" value="$(arg enable_detectron)" />
-        <param name="detectron_ip" type="str" value="192.168.1.121"/>
+        <param name="detectron_ip" type="str" value="192.168.1.139"/>
         <param name="detectron_port" type="int" value="8801"/>
         <param name="detectron_model" type="str" value="$(arg detectron_model)"/>
     </node>
@@ -36,8 +36,9 @@
     <node name="pc_seg_generator_node" pkg="perception_ros" type="pc_seg_generator_node" output="screen" if="$(arg pub_point_cloud)">
         <rosparam command="load" file="$(find perception_ros)/cfg/seg_param.yaml" />
         <param name="use_semantic_segmentation" type="bool" value="true" />
-        <param name="use_geometric_segmentation" type="bool" value="false" />
+        <param name="use_geometric_segmentation" type="bool" value="true" />
         <param name="use_distance_check" type="bool" value="false" />
+        <param name="use_direct_fusion" type="bool" value="false" />
         <param name="use_GT_camera_frame" type="bool" value="true" />
         <param name="camera_frame" type="string" value="$(arg camera_frame)" />
         <param name="geo_seg_mode" type="int" value="0" />  <!--0 for depth and 1 for point cloud-->>

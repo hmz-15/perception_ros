@@ -45,14 +45,14 @@ const std::vector<ObjClass> obj_lib = {
 };
 
 const std::vector<SemClass> sem_lib = {
-    {{92, 136, 89}, {87}, "Door"}, 
+    // {{92, 136, 89}, {87}, "Door"}, 
     {{209, 226, 140}, {122}, "Table"}, 
     // {{255, 160, 98}, {125}, "shelf"},
     {{134, 199, 156}, {121}, "Cabinet"},
     // {{218, 88, 184}, {123}, "floor"}, 
-    {{218, 88, 184}, {88, 97, 98, 101, 124, 123}, "Floor"}, 
+    {{96, 36, 108}, {88, 97, 98, 101, 124, 123}, "Floor"}, 
     // {{137, 54, 74}, {132}, "wall"}, 
-    {{137, 54, 74}, {110, 111, 112, 113, 132}, "Wall"},
+    {{102, 102, 156}, {110, 111, 112, 113, 132}, "Wall"},
     // {{183, 121, 142}, {115, 116}, "window"},
     {{146, 139, 141}, {119}, "Ceiling"}
     // {{146, 139, 0}, {119}, "ceiling"}
@@ -74,6 +74,7 @@ PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handl
     node_handle_.param<bool>("use_semantic_segmentation", use_semantic_segmentation, false);
     node_handle_.param<bool>("use_geometric_segmentation", use_geometric_segmentation, false);
     node_handle_.param<bool>("use_distance_check", use_distance_check, false);
+    node_handle_.param<bool>("use_direct_fusion", use_direct_fusion, false);
     node_handle_.param<bool>("use_GT_camera_frame", use_GT_camera_frame, true);
     node_handle_.param<std::string>("camera_frame", camera_frame, "camera_link");
     node_handle_.param<int>("geo_seg_mode", geo_seg_mode, 1);
@@ -426,7 +427,12 @@ void PCSegGeneratorNode::ProcessSegMsg (const seg_msgs::SegConstPtr& msgSeg)
         obj.category = seg_result.obj_category[i];
         obj.score = seg_result.obj_scores[i];
         obj.is_dynamic = false;
-        obj.color = (*it).color;
+
+        // Random color for instance
+        // obj.color = (*it).color;
+        cv::Vec3b color(rand() % 255,rand() % 255,rand() % 255);
+        obj.color = color;
+
         obj.box = cv::Rect(x1,y1,x2-x1,y2-y1);
         obj.area = (x2-x1)*(y2-y1);
         obj.cate_name = (*it).name;
@@ -541,7 +547,7 @@ void PCSegGeneratorNode::LabelPC ()
             if (object_it != instance_category_pairs.end())
             {
 
-                if ((instance_area_pairs.find(map_it->first)->second > 800) && (map_it->second > 0.8 * instance_area_pairs.find(map_it->first)->second) && (map_it->second < 0.5 * sum_count))
+                if (use_direct_fusion && (instance_area_pairs.find(map_it->first)->second > 800) && (map_it->second > 0.8 * instance_area_pairs.find(map_it->first)->second) && (map_it->second < 0.5 * sum_count))
                 {
                     extracted_instances.push_back(*object_it);
 
@@ -644,8 +650,8 @@ void PCSegGeneratorNode::LabelPC ()
         }
 
         // Organize pairs of instance id and point cloud index (only consider object instances)
-        // if ((instance_category_pairs.find(max_candidate.first) != instance_category_pairs.end()) || (max_candidate.second == 122))
-        if (instance_category_pairs.find(max_candidate.first) != instance_category_pairs.end())
+        if ((instance_category_pairs.find(max_candidate.first) != instance_category_pairs.end()) || (max_candidate.second == 122) || (max_candidate.second == 121))
+        // if (instance_category_pairs.find(max_candidate.first) != instance_category_pairs.end())
         {
             auto id_it = id_pc_pairs.find(max_candidate.first);
             if (id_it != id_pc_pairs.end())
@@ -663,7 +669,7 @@ void PCSegGeneratorNode::LabelPC ()
     // Distance check for segments with the same instance id
     if (use_distance_check)
     {
-        float radius = 0.05;
+        float radius = 0.1;
         for (auto inst_id_it = id_pc_pairs.begin(); inst_id_it != id_pc_pairs.end(); inst_id_it++)
         {
             int size = inst_id_it->second.size();
@@ -773,7 +779,7 @@ void PCSegGeneratorNode::LabelPC ()
                     {
                         for (int p = 0; p < inst_id_it->second[*it]->points.size(); p++)
                         {
-                            // inst_id_it->second[*it]->points[p].instance_label = 0u;
+                            inst_id_it->second[*it]->points[p].instance_label = 0u;
                             inst_id_it->second[*it]->points[p].semantic_label = 80u;
                         }
                     }
@@ -786,15 +792,77 @@ void PCSegGeneratorNode::LabelPC ()
     for (int p = 0; p < extra_clouds.size(); p++)
         if ((extra_clouds[p])->points.size() > 800)
             clouds.push_back(extra_clouds[p]);
+
+    cv::Mat seg_img(height, width, CV_8UC3, cv::Scalar(0, 0, 0));
+
+    for (int i = 0; i < clouds.size(); i++)
+    {
+        for (int j = 0; j < clouds[i]->points.size(); j++)
+        {
+            int x = (int) (clouds[i]->points[j].x * fx / clouds[i]->points[j].z + cx);
+            int y = (int) (clouds[i]->points[j].y * fy / clouds[i]->points[j].z + cy);
+
+            if (x < 0)
+                x = 0;
+            if (x > width - 2)
+                x = width - 2;
+            if (y < 0)
+                y = 0;
+            if (y > height - 2)
+                y = height - 2;
+
+            int semantic_label = (int)clouds[i]->points[j].semantic_label;
+            int instance_label = (int)clouds[i]->points[j].instance_label;
+
+            auto sem_it = std::find_if(sem_lib.begin(), sem_lib.end(),
+            [=] (const SemClass& f) { return (std::find(f.category_id.begin(), f.category_id.end(), semantic_label) != f.category_id.end()); });
+            if (sem_it != sem_lib.end())
+            {
+                seg_img.at<cv::Vec3b>(y, x) = sem_it->color;
+                seg_img.at<cv::Vec3b>(y+1, x) = sem_it->color;
+                seg_img.at<cv::Vec3b>(y, x+1) = sem_it->color;
+                seg_img.at<cv::Vec3b>(y+1, x+1) = sem_it->color;
+                continue;
+            }
+
+            auto obj_it = std::find_if(objects.begin(), objects.end(),
+            [=] (const Obj2D& f) { return (f.id == instance_label); });
+            if (obj_it != objects.end())
+            {
+                seg_img.at<cv::Vec3b>(y, x) = obj_it->color;
+                seg_img.at<cv::Vec3b>(y+1, x) = obj_it->color;
+                seg_img.at<cv::Vec3b>(y, x+1) = obj_it->color;
+                seg_img.at<cv::Vec3b>(y+1, x+1) = obj_it->color;
+                continue;
+            }
+
+            seg_img.at<cv::Vec3b>(y, x) = {200, 200, 200};
+            seg_img.at<cv::Vec3b>(y+1, x) = {200, 200, 200};
+            seg_img.at<cv::Vec3b>(y, x+1) = {200, 200, 200};
+            seg_img.at<cv::Vec3b>(y+1, x+1) = {200, 200, 200};
+
+        }
+    }
+    if (save_img)
+    {
+        std::string path = ros::package::getPath("perception_ros");
+        cv::Mat seg_img_save = seg_img.clone();
+        cv::cvtColor(seg_img_save, seg_img_save, CV_RGB2BGR);  // opencv uses bgr as default
+        cv::imwrite(path + "/image/fusion/" + std::to_string(NFrame)+".jpg",seg_img_save);
+    }
+
+
         
 }
 
 
 cv::Mat PCSegGeneratorNode::DrawInstSeg()
 {
-    cv::Mat inst_seg_img = imRGB.clone();
-    int height = inst_seg_img.rows;
-    int width = inst_seg_img.cols;
+    // cv::Mat inst_seg_img = imRGB.clone();
+    int height = imRGB.rows;
+    int width = imRGB.cols;
+
+    cv::Mat inst_seg_img(height, width, CV_8UC3, cv::Scalar(200, 200, 200));
 
     for (int m = 0; m < semantics.size(); m++)
     {

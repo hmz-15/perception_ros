@@ -49,7 +49,7 @@ depth:
   label_display: true
   label_inpaint_method: 0
   label_method: 1
-  label_min_size: 500
+  label_min_size: 200
   label_use_inpaint: false
   max_distance_display: false
   max_distance_exclude_nan_as_max_distance: false

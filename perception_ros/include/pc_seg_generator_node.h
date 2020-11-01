@@ -65,6 +65,7 @@ private:
     bool use_semantic_segmentation = false;
     bool use_geometric_segmentation = false;
     bool use_distance_check = false;
+    bool use_direct_fusion = false;
     bool use_GT_camera_frame = true;
     std::string camera_frame;
     int geo_seg_mode = GeometricSegMode::kPointCloud;

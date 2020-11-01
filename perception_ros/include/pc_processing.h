@@ -8,7 +8,6 @@
 #include <pcl/common/impl/centroid.hpp>
 #include <pcl/filters/filter.h>
 #include <pcl/filters/impl/filter.hpp>
-#include <pcl/features/normal_3d.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/impl/conditional_removal.hpp>
 #include <pcl/filters/radius_outlier_removal.h>

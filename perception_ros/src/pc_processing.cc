@@ -38,8 +38,8 @@ PCProcessor::PCProcessor(ros::NodeHandle& node_handle, bool visualize_geo_seg, b
     ROS_INFO("Initialize pc_processor!");
 
     // initialize filters and segmentors
-    pcl::search::KdTree<PointSurfelLabel>::Ptr tree_label (new pcl::search::KdTree<PointSurfelLabel>);
-    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree_normal (new pcl::search::KdTree<pcl::PointXYZRGB> ());
+    tree_label.reset (new pcl::search::KdTree<PointSurfelLabel>);
+    tree_normal.reset (new pcl::search::KdTree<pcl::PointXYZRGB>);
         
 }
 

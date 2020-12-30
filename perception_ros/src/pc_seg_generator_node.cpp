@@ -79,6 +79,7 @@ PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handl
     node_handle_.param<std::string>("camera_frame", camera_frame, "camera_link");
     node_handle_.param<int>("geo_seg_mode", geo_seg_mode, 1);
     node_handle_.param<bool>("visualize_geo_seg", visualize_geo_seg, false);
+    node_handle_.param<bool>("visualize_pano_seg", visualize_pano_seg, false);
     node_handle_.param<bool>("pub_seg_img", pub_seg_img, false);
     node_handle_.param<bool>("save_img", save_img, false);
 
@@ -913,6 +914,14 @@ cv::Mat PCSegGeneratorNode::DrawInstSeg()
         cv::putText(inst_seg_img, text, anchor, cv::FONT_HERSHEY_COMPLEX_SMALL, 0.8, cv::viz::Color::green(), 1.8, cv::LINE_AA);
     }
 
+    if (visualize_pano_seg) 
+    {
+        static const std::string kWindowName = "PanoSeg";
+        cv::namedWindow(kWindowName, cv::WINDOW_NORMAL);
+        cv::resizeWindow(kWindowName, 480, 360);
+        cv::imshow(kWindowName, inst_seg_img);
+        cv::waitKey(1);
+    }
     if (save_img)
     {
         std::string path = ros::package::getPath("perception_ros");

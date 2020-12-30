@@ -977,8 +977,11 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   }
 
   if (params_.label.display) {
-    static const std::string kWindowName = "LabelMap";
-    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    static const std::string kWindowName = "DepthSeg";
+    cv::namedWindow(kWindowName, cv::WINDOW_NORMAL);
+    // cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    
+    cv::resizeWindow(kWindowName, 480, 360);
     imshow(kWindowName, output);
     cv::waitKey(1);
   }

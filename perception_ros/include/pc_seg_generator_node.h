@@ -70,6 +70,7 @@ private:
     std::string camera_frame;
     int geo_seg_mode = GeometricSegMode::kPointCloud;
     bool visualize_geo_seg = false;
+    bool visualize_pano_seg = false;
     bool pub_seg_img = false;
     bool save_img = false;
 

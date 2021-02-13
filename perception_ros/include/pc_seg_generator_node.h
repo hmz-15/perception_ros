@@ -93,9 +93,10 @@ private:
     std::vector<Obj2D> objects = {};
     std::vector<Sem2D> semantics = {}; 
     std::vector<int> mov_list = {};
-    std::map<int, int> instance_category_pairs = {};
-    std::map<int, int> instance_area_pairs = {};
-    std::map<int, int> semantics_category_pairs = {};
+    std::unordered_map<int, std::pair<int, int>> instance_category_area_map = {};
+    std::unordered_map<int, std::pair<int, int>> semantics_category_area_map = {};
+    // std::map<int, int> instance_area_pairs = {};
+    // std::map<int, int> semantics_category_pairs = {};
 
     // Point cloud segments
     std::vector<pcl::PointCloud<PointSurfelLabel>::Ptr> clouds = {};

@@ -46,7 +46,7 @@ const std::vector<ObjClass> obj_lib = {
 
 const std::vector<SemClass> sem_lib = {
     // {{92, 136, 89}, {87}, "Door"}, 
-    {{209, 226, 140}, {122}, "Table"}, 
+    // {{209, 226, 140}, {122}, "Table"}, 
     // {{255, 160, 98}, {125}, "shelf"},
     {{134, 199, 156}, {121}, "Cabinet"},
     // {{218, 88, 184}, {123}, "floor"}, 
@@ -86,20 +86,20 @@ PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handl
     node_handle_.param<bool>("verbose", verbose, true);
 
     // image subscriber
-    rgb_subscriber_ = new message_filters::Subscriber<sensor_msgs::Image> (node_handle_, "/perception/rgb_image", 1);
-    depth_subscriber_ = new message_filters::Subscriber<sensor_msgs::Image> (node_handle_, "/perception/depth_image", 1);
+    rgb_subscriber_ = new message_filters::Subscriber<sensor_msgs::Image> (node_handle_, "/perception/rgb_image", 100);
+    depth_subscriber_ = new message_filters::Subscriber<sensor_msgs::Image> (node_handle_, "/perception/depth_image", 100);
 
     if (!use_semantic_segmentation)
     {
         ROS_INFO("Disable semantic-instance segmentation!");
-        sync_ = new message_filters::Synchronizer<sync_pol> (sync_pol(2), *rgb_subscriber_, *depth_subscriber_);
+        sync_ = new message_filters::Synchronizer<sync_pol> (sync_pol(100), *rgb_subscriber_, *depth_subscriber_);
         sync_->registerCallback(boost::bind(&PCSegGeneratorNode::ImageCallback, this, _1, _2));
     }
     else
     {
         ROS_INFO("Enable semantic-instance segmentation!");
-        seg_subscriber_ = new message_filters::Subscriber<seg_msgs::Seg> (node_handle_, "/perception/seg", 1);
-        seg_sync_ = new message_filters::Synchronizer<seg_sync_pol> (seg_sync_pol(2), *rgb_subscriber_, *depth_subscriber_, *seg_subscriber_);
+        seg_subscriber_ = new message_filters::Subscriber<seg_msgs::Seg> (node_handle_, "/perception/seg", 100);
+        seg_sync_ = new message_filters::Synchronizer<seg_sync_pol> (seg_sync_pol(100), *rgb_subscriber_, *depth_subscriber_, *seg_subscriber_);
         seg_sync_->registerCallback(boost::bind(&PCSegGeneratorNode::ImageSegCallback, this, _1, _2, _3));
     }
 
@@ -330,11 +330,11 @@ void PCSegGeneratorNode::Update()
     mov_list.clear();
     clouds.clear();
     cloud.reset(new pcl::PointCloud<pcl::PointXYZRGB>);
-    instance_category_pairs.clear();
-    instance_area_pairs.clear();
-    semantics_category_pairs.clear();
+    instance_category_area_map.clear();
+    semantics_category_area_map.clear();
 
     NFrame ++;
+    std::cout << "No. frame: " << NFrame <<std::endl;
 }
 
 
@@ -451,11 +451,10 @@ void PCSegGeneratorNode::ProcessSegMsg (const seg_msgs::SegConstPtr& msgSeg)
                     area_accurate += ((int)imSeg.at<uchar>(k,j)==obj.id);
             obj.area = area_accurate;
         }
-        instance_category_pairs.insert(std::pair<int,int>(obj.id, obj.category));
-        instance_area_pairs.insert(std::pair<int,int>(obj.id, obj.area));
+        instance_category_area_map.insert(std::make_pair(obj.id, std::make_pair(obj.category, obj.area)));
+        // instance_area_pairs.insert(std::pair<int,int>(obj.id, obj.area));
                           
         objects.push_back(obj);
-        // N_obj ++;
     }
     // Process semantic segmentation result
     int sem_num = seg_result.sem_id.size();
@@ -475,8 +474,8 @@ void PCSegGeneratorNode::ProcessSegMsg (const seg_msgs::SegConstPtr& msgSeg)
                 sem.color = sem_lib[j].color;
                 sem.cate_name = sem_lib[j].name;
                 semantics.push_back(sem);
-                semantics_category_pairs.insert(std::pair<int,int>(sem.id, sem.category));
-                // N_sem ++;
+                semantics_category_area_map.insert(std::make_pair(sem.id, std::make_pair(sem.category, sem.area)));
+                // semantics_category_pairs.insert(std::pair<int,int>(sem.id, sem.category));
                 break;
             }
         }     
@@ -498,11 +497,11 @@ void PCSegGeneratorNode::LabelPC ()
     register int height = imRGB.rows;
 
     std::vector<pcl::PointCloud<PointSurfelLabel>::Ptr> extra_clouds = {};
-    std::map<int, std::vector<pcl::PointCloud<PointSurfelLabel>::Ptr>> id_pc_pairs = {};
+    std::unordered_map<int, std::vector<pcl::PointCloud<PointSurfelLabel>::Ptr>> id_pc_pairs = {};
 
     for (auto cloud_it = clouds.begin(); cloud_it != clouds.end(); )
     {
-        std::map<int, int> candidate_pairs;
+        std::unordered_map<int, int> candidate_pairs;
         int sum_count = 0;
         if ((*cloud_it)->points.size() < 800)
         {
@@ -540,18 +539,17 @@ void PCSegGeneratorNode::LabelPC ()
         // Extract instances that are not segmented geometrically
         std::pair<int, int> max_candidate = std::make_pair(0,80);
         int max_count = 0;
-        std::vector<std::pair<int, int>> extracted_instances = {};
-        std::vector<pcl::PointCloud<PointSurfelLabel>::Ptr> extract_clouds = {};
+        std::unordered_map<int, std::pair<int, pcl::PointCloud<PointSurfelLabel>::Ptr>> extracted_instances;
+        // std::vector<std::pair<int, int>> extracted_instances = {};
+        // std::vector<pcl::PointCloud<PointSurfelLabel>::Ptr> extract_clouds = {};
         for (auto map_it = candidate_pairs.begin(); map_it != candidate_pairs.end(); map_it++)
         {
-            auto object_it = instance_category_pairs.find(map_it->first);
-            if (object_it != instance_category_pairs.end())
+            auto object_it = instance_category_area_map.find(map_it->first);
+            if (object_it != instance_category_area_map.end())
             {
-
-                if (use_direct_fusion && (instance_area_pairs.find(map_it->first)->second > 800) && (map_it->second > 0.8 * instance_area_pairs.find(map_it->first)->second) && (map_it->second < 0.5 * sum_count))
+                if (use_direct_fusion && (map_it->second > 0.8 * object_it->second.second)) 
+                // && (map_it->second < 0.5 * sum_count))
                 {
-                    extracted_instances.push_back(*object_it);
-
                     pcl::PointCloud<PointSurfelLabel>::Ptr extract_cloud (new pcl::PointCloud<PointSurfelLabel>);                    
                     extract_cloud->is_dense = false;
                     extract_cloud->sensor_origin_.setZero ();
@@ -559,30 +557,49 @@ void PCSegGeneratorNode::LabelPC ()
                     extract_cloud->sensor_orientation_.x () = 1.0f;
                     extract_cloud->sensor_orientation_.y () = 0.0f;
                     extract_cloud->sensor_orientation_.z () = 0.0f; 
-                    extract_clouds.push_back(extract_cloud); 
+                    // extract_clouds.push_back(extract_cloud); 
+                    extracted_instances.insert(std::make_pair(object_it->first, std::make_pair(object_it->second.first, extract_cloud)));
 
                     sum_count -= map_it->second;
-                    continue;
                 }
                 else
                 {
                     if (map_it->second > max_count)
                     {
-                        max_candidate = *object_it;
+                        max_candidate = std::make_pair(object_it->first, object_it->second.first);
                         max_count = map_it->second;
                     }   
-                    continue;
                 }
+                continue;
             }
 
-            auto semantics_it = semantics_category_pairs.find(map_it->first);
-            if (semantics_it != semantics_category_pairs.end())
+            auto semantics_it = semantics_category_area_map.find(map_it->first);
+            if (semantics_it != semantics_category_area_map.end())
             {
-                if (map_it->second > max_count)
+                if (use_direct_fusion && (map_it->second > 0.4 * semantics_it->second.second)) 
+                // && (map_it->second < 0.5 * sum_count))
                 {
-                    max_candidate = *semantics_it;
-                    max_count = map_it->second;
-                }     
+                    pcl::PointCloud<PointSurfelLabel>::Ptr extract_cloud (new pcl::PointCloud<PointSurfelLabel>);                    
+                    extract_cloud->is_dense = false;
+                    extract_cloud->sensor_origin_.setZero ();
+                    extract_cloud->sensor_orientation_.w () = 0.0f;
+                    extract_cloud->sensor_orientation_.x () = 1.0f;
+                    extract_cloud->sensor_orientation_.y () = 0.0f;
+                    extract_cloud->sensor_orientation_.z () = 0.0f; 
+                    // extract_clouds.push_back(extract_cloud); 
+                    extracted_instances.insert(std::make_pair(semantics_it->first, std::make_pair(semantics_it->second.first, extract_cloud)));
+
+                    sum_count -= map_it->second;
+                }
+                else
+                {
+                    if (map_it->second > max_count)
+                    {
+                        max_candidate = std::make_pair(semantics_it->first, semantics_it->second.first);
+                        max_count = map_it->second;
+                    }     
+                    
+                }                
             }
         }
 
@@ -599,21 +616,21 @@ void PCSegGeneratorNode::LabelPC ()
 
         // Separate extracted instances and assign labels to the original segment and others
         float bad_point = std::numeric_limits<float>::quiet_NaN ();
-        if (extract_clouds.size() > 0)
+        if (extracted_instances.size() > 0)
         {
             if (verbose)
                 ROS_INFO("Start extracting instances!");
             for (int j = 0; j < (*cloud_it)->points.size(); j++)
             {
                 int label = (int)(*cloud_it)->points[j].instance_label;
-                auto it = std::find_if(extracted_instances.begin(), extracted_instances.end(), [&label](const std::pair<int, int>& element){ return element.first == label;} );
+                auto it = extracted_instances.find(label);
                 if (it != extracted_instances.end())
                 {
                     PointSurfelLabel pt;
                     pcl::copyPoint((*cloud_it)->points[j], pt);
                     pt.instance_label = (uint8_t)(it->first);
-                    pt.semantic_label = (uint8_t)(it->second);
-                    (extract_clouds[it-extracted_instances.begin()])->push_back(pt);
+                    pt.semantic_label = (uint8_t)(it->second.first);
+                    it->second.second->push_back(pt);
                     (*cloud_it)->points[j].x = (*cloud_it)->points[j].y = (*cloud_it)->points[j].z = bad_point;
                 }
                 else
@@ -629,17 +646,13 @@ void PCSegGeneratorNode::LabelPC ()
             for (int k = 0; k < mov_list.size(); k++)
             {
                 int mov_id = mov_list[k];
-                auto inst_it = std::find_if(extracted_instances.begin(), extracted_instances.end(), [&mov_id](const std::pair<int, int>& element){ return element.first == mov_id;} );
+                auto inst_it = extracted_instances.find(mov_id);
                 if (inst_it != extracted_instances.end())
-                {
                     extracted_instances.erase(inst_it);
-                    int index = inst_it-extracted_instances.begin();
-                    extract_clouds.erase(extract_clouds.begin()+index);
-                }
             }
             // Append clouds of extra extracted instance to the list
-            for (int l = 0; l < extract_clouds.size(); l++)
-                extra_clouds.push_back(extract_clouds[l]);
+            for (auto instance: extracted_instances)
+                extra_clouds.push_back(instance.second.second);
         }
         else
         {
@@ -651,8 +664,8 @@ void PCSegGeneratorNode::LabelPC ()
         }
 
         // Organize pairs of instance id and point cloud index (only consider object instances)
-        if ((instance_category_pairs.find(max_candidate.first) != instance_category_pairs.end()) || (max_candidate.second == 122) || (max_candidate.second == 121))
-        // if (instance_category_pairs.find(max_candidate.first) != instance_category_pairs.end())
+        if ((instance_category_area_map.find(max_candidate.first) != instance_category_area_map.end()) || (max_candidate.second == 122) || (max_candidate.second == 121))
+        // if (instance_category_area_map.find(max_candidate.first) != instance_category_area_map.end())
         {
             auto id_it = id_pc_pairs.find(max_candidate.first);
             if (id_it != id_pc_pairs.end())
@@ -671,9 +684,9 @@ void PCSegGeneratorNode::LabelPC ()
     if (use_distance_check)
     {
         float radius = 0.1;
-        for (auto inst_id_it = id_pc_pairs.begin(); inst_id_it != id_pc_pairs.end(); inst_id_it++)
+        for (auto id_pc_pair: id_pc_pairs)
         {
-            int size = inst_id_it->second.size();
+            int size = id_pc_pair.second.size();
             if (size > 1)
             {
                 if (verbose)
@@ -690,14 +703,14 @@ void PCSegGeneratorNode::LabelPC ()
                 for (int i = 0; i < size - 1; i++)
                 {
                     pcl::KdTreeFLANN<PointSurfelLabel> kdtree;
-                    kdtree.setInputCloud (inst_id_it->second[i]);
+                    kdtree.setInputCloud (id_pc_pair.second[i]);
                     for (int j = i + 1; j < size; j++)
                     {
                         std::vector<int> pointIdxRadiusSearch;
                         std::vector<float> pointRadiusSquaredDistance;
-                        for (int k = 0; k < inst_id_it->second[j]->points.size(); k += 5) // sample points
+                        for (int k = 0; k < id_pc_pair.second[j]->points.size(); k += 3) // sample points
                         {
-                            if (kdtree.radiusSearch (inst_id_it->second[j]->points[k], radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
+                            if (kdtree.radiusSearch (id_pc_pair.second[j]->points[k], radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
                             {
                                 neighbors[i] += 1;
                                 neighbors[j] += 1;
@@ -732,7 +745,7 @@ void PCSegGeneratorNode::LabelPC ()
                 {
                     int current_segment_index = *(unclustered_set.begin());
                     std::set<int> current_cluster = {current_segment_index};
-                    int current_cluster_count = inst_id_it->second[current_segment_index]->size();
+                    int current_cluster_count = id_pc_pair.second[current_segment_index]->size();
                     if (neighbors[current_segment_index] > 0)
                     {   // width-first search
                         std::set<int> next_check = neighbor_pairs.find(current_segment_index)->second;
@@ -741,22 +754,22 @@ void PCSegGeneratorNode::LabelPC ()
                             int current_check_index = *(next_check.begin());
                             auto ret = current_cluster.emplace(current_check_index);
                             if (ret.second)
-                                current_cluster_count += inst_id_it->second[current_check_index]->size();
+                                current_cluster_count += id_pc_pair.second[current_check_index]->size();
 
                             if (neighbors[current_check_index] > 1)
                             {
                                 std::set<int> future_check = neighbor_pairs.find(current_check_index)->second;
-                                for (auto check_it = future_check.begin(); check_it != future_check.end(); check_it++)
+                                for (auto check: future_check)
                                 {
-                                    if (current_cluster.find(*check_it) == current_cluster.end())
-                                        next_check.emplace(*check_it);
+                                    if (current_cluster.find(check) == current_cluster.end())
+                                        next_check.emplace(check);
                                 }
                             }
                             next_check.erase(next_check.find(current_check_index));
                         }   
                     }
-                    for (auto it = current_cluster.begin(); it != current_cluster.end(); it++)
-                        unclustered_set.erase(unclustered_set.find(*it));
+                    for (auto index: current_cluster)
+                        unclustered_set.erase(unclustered_set.find(index));
 
                     clusters.insert(current_cluster);  
                     if (current_cluster_count > max_cluster_count)
@@ -776,12 +789,12 @@ void PCSegGeneratorNode::LabelPC ()
                 {
                     if (verbose)
                         ROS_INFO("Filter outliers!");
-                    for (auto it = outlier.begin(); it != outlier.end(); it++)
+                    for (int out: outlier)
                     {
-                        for (int p = 0; p < inst_id_it->second[*it]->points.size(); p++)
+                        for (int p = 0; p < id_pc_pair.second[out]->points.size(); p++)
                         {
-                            inst_id_it->second[*it]->points[p].instance_label = 0u;
-                            inst_id_it->second[*it]->points[p].semantic_label = 80u;
+                            id_pc_pair.second[out]->points[p].instance_label = 0u;
+                            id_pc_pair.second[out]->points[p].semantic_label = 80u;
                         }
                     }
                 }  
@@ -791,7 +804,7 @@ void PCSegGeneratorNode::LabelPC ()
         
     // Append clouds of extra extracted instance to the final list
     for (int p = 0; p < extra_clouds.size(); p++)
-        if ((extra_clouds[p])->points.size() > 800)
+        if ((extra_clouds[p])->points.size() > 400)
             clouds.push_back(extra_clouds[p]);
 
     cv::Mat seg_img(height, width, CV_8UC3, cv::Scalar(0, 0, 0));

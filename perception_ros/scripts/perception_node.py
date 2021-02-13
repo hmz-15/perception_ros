@@ -50,7 +50,7 @@ class PerceptionNode(object):
         self.depth_info_sub_ = Subscriber('/camera/depth/camera_info', CameraInfo)
 
         # self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.rgb_info_sub_, self.depth_info_sub_], queue_size=1, slop=0.05)
-        self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.rgb_info_sub_], queue_size=2, slop=0.3)
+        self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.rgb_info_sub_], queue_size=2, slop=0.1)
         self.syn_sub_.registerCallback(self.perceive_)
 
         self.dt_pub = rospy.Publisher("/perception/seg", Seg, queue_size=1)
@@ -63,11 +63,11 @@ class PerceptionNode(object):
 
         self.bridge_ = CvBridge()
 
-        self.rgb_image_ = 0
-        self.depth_image_ = 0
-        self.rgb_info_ = 0
-        self.depth_info_ = 0
-        self.flag_ = False
+        self.rgb_image_ = None
+        self.depth_image_ = None
+        self.rgb_info_ = None
+        self.depth_info_ = None
+        self.flag_ = False  # if new message comes
 
 
 
@@ -77,102 +77,66 @@ class PerceptionNode(object):
 
     def launch(self):
         while not rospy.is_shutdown():
-
-            if (self.flag_):
+            
+            if not self.rgb_image_ == None and self.flag_:
                 start = rospy.get_time()
-                
-                rgb_img_ = self.rgb_image_
-                depth_img_ = self.depth_image_
-                rgb_info_ = self.rgb_info_
-                # depth_info_ = self.depth_info_
-                time_ = rgb_img_.header.stamp
 
-                if self.use_vrep_:
-                    print("+++++++++++++++++++++++++++++++++++++++++")
-                    dep_img = self.bridge_.imgmsg_to_cv2(depth_img_, desired_encoding="16UC1")
-                    dep_flip_img = cv2.flip(dep_img, 0)
-                    depth_flip_img_ = self.bridge.cv2_to_imgmsg(dep_flip_img, desired_encoding="16UC1")
-                    depth_flip_img_.header = depth_img_.header
-
-                img = self.bridge_.imgmsg_to_cv2(rgb_img_)
+                img = self.bridge_.imgmsg_to_cv2(self.rgb_image_)
                 height, width, channels = img.shape
-                # if (channels == 4):
-                #     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-
-                if height != 480:
-                    img = cv2.resize(img, (640, 480))
-                    depth_img = self.bridge_.imgmsg_to_cv2(depth_img_)
-                    depth_img = cv2.resize(depth_img, (640, 480), interpolation=cv2.INTER_NEAREST)
-
-                    depth_resize_img_ = self.bridge_.cv2_to_imgmsg(depth_img)
-                    depth_resize_img_.header = depth_img_.header
-                    rgb_resize_img_ = self.bridge_.cv2_to_imgmsg(img)
-                    # rgb_resize_img_ = self.bridge_.cv2_to_imgmsg(img,"bgr8")
-                    rgb_resize_img_.header = rgb_img_.header
-
-                    depth_img_ = depth_resize_img_
-                    rgb_img_ = rgb_resize_img_
-
-                    rgb_info_.height = 480
-                    rgb_info_.width = 640
-
-                    K = list(rgb_info_.K)
-                    P = list(rgb_info_.P)
-                    x_ratio = width/640
-                    y_ratio = height/480
-                    K[0] = K[0]/x_ratio
-                    K[2] = K[2]/x_ratio
-                    K[4] = K[4]/y_ratio
-                    K[5] = K[5]/y_ratio
-
-                    P[0] = P[0]/x_ratio
-                    P[2] = P[2]/x_ratio
-                    P[3] = P[3]/x_ratio
-                    P[5] = P[5]/y_ratio
-                    P[6] = P[6]/y_ratio
-
-                    rgb_info_.K = tuple(K)
-                    rgb_info_.P = tuple(P)
-                    # depth_info_.height = 480
-                    # depth_info_.width = 640
-
+                time = self.rgb_image_.header.stamp
+                
                 # Get detection result
                 img_bin = pack_img(img)
                 # print("input")
 
                 if self.enable_openpose_:
-                    self.pub_op_(img_bin, time_)
+                    self.pub_op_(img_bin, time)
 
                 
                 if self.enable_detectron_:
-                    self.pub_dt_(img_bin, time_)
+                    self.pub_dt_(img_bin, time)
 
-                # Publish frame
-                self.rgb_pub.publish(rgb_img_)
-                self.rgb_info_pub.publish(rgb_info_)
-                # self.depth_info_pub.publish(depth_info_)
-
-                if self.use_vrep_:
-                    self.depth_pub.publish(depth_flip_img_)
-                else:
-                    self.depth_pub.publish(depth_img_)
-
-                self.flag_ = False
 
                 end = rospy.get_time()
                 # print(end-start)
+
+                self.flag_ = False
 
     
     # def perceive_(self, rgb_img, depth_img, rgb_info, depth_info):
     def perceive_(self, rgb_img, depth_img, rgb_info):
         # print("percieve")
-        if not self.flag_:
             
-            self.rgb_image_ = rgb_img
-            self.depth_image_ = depth_img
-            self.rgb_info_ = rgb_info
-            # self.depth_info_ = depth_info 
-            self.flag_ = True
+        self.rgb_image_ = rgb_img
+        self.depth_image_ = depth_img
+        self.rgb_info_ = rgb_info
+        # self.depth_info_ = depth_info 
+
+        if self.use_vrep_:
+            dep_img = self.bridge_.imgmsg_to_cv2(depth_img, desired_encoding="16UC1")
+            dep_flip_img = cv2.flip(dep_img, 0)
+            depth_flip_img_ = self.bridge_.cv2_to_imgmsg(dep_flip_img, encoding="16UC1")
+            depth_flip_img_.header = depth_img.header
+
+        # img = self.bridge_.imgmsg_to_cv2(rgb_img)
+        # height, width, channels = img.shape
+        # if (channels == 4):
+        #     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
+        # may include some other processing
+
+        # Publish frame
+        self.rgb_pub.publish(rgb_img)
+        self.rgb_info_pub.publish(rgb_info)
+        # self.depth_info_pub.publish(depth_info_)
+
+        if self.use_vrep_:
+            self.depth_pub.publish(depth_flip_img_)
+        else:
+            self.depth_pub.publish(depth_img)
+
+        self.flag_ = True
+
 
 
 

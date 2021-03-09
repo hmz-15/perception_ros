@@ -71,6 +71,7 @@ private:
     int geo_seg_mode = GeometricSegMode::kPointCloud;
     bool visualize_geo_seg = false;
     bool visualize_pano_seg = false;
+    bool visualize_fusion_seg = false;
     bool pub_seg_img = false;
     bool save_img = false;
 
@@ -82,7 +83,7 @@ private:
 
     // Frame time and id
     std::string camera_frame_id_;
-    ros::Time current_frame_time_ = ros::Time::now(); ;
+    ros::Time current_frame_time_ = ros::Time::now();
 
     // Images to process
     cv::Mat imRGB;

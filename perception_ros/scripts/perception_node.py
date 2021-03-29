@@ -50,7 +50,7 @@ class PerceptionNode(object):
         self.depth_info_sub_ = Subscriber('/camera/depth/camera_info', CameraInfo)
 
         # self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.rgb_info_sub_, self.depth_info_sub_], queue_size=1, slop=0.05)
-        self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.rgb_info_sub_], queue_size=2, slop=0.1)
+        self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.rgb_info_sub_], queue_size=10, slop=0.2)
         self.syn_sub_.registerCallback(self.perceive_)
 
         self.dt_pub = rospy.Publisher("/perception/seg", Seg, queue_size=1)
@@ -79,6 +79,7 @@ class PerceptionNode(object):
         while not rospy.is_shutdown():
             
             if not self.rgb_image_ == None and self.flag_:
+                self.flag_ = False
                 start = rospy.get_time()
 
                 img = self.bridge_.imgmsg_to_cv2(self.rgb_image_)
@@ -99,8 +100,6 @@ class PerceptionNode(object):
 
                 end = rospy.get_time()
                 # print(end-start)
-
-                self.flag_ = False
 
     
     # def perceive_(self, rgb_img, depth_img, rgb_info, depth_info):

@@ -48,7 +48,7 @@
         <param name="geo_seg_mode" type="int" value="0" />  <!--0 for depth and 1 for point cloud-->>
         <param name="visualize_geo_seg" type="bool" value="false" />
         <param name="visualize_pano_seg" type="bool" value="false" />
-        <param name="visualize_fusion_seg" type="bool" value="true" />
+        <param name="visualize_fusion_seg" type="bool" value="false" />
         <param name="pub_seg_img" type="bool" value="true" />
         <param name="save_img" type="bool" value="false" />
     </node>

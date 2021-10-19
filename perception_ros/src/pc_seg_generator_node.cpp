@@ -10,7 +10,7 @@ const std::vector<ObjClass> obj_lib = {
     // rgb color, class id, class name
     {{220, 20, 60}, 0, "Person"}, 
     // {{119, 11, 32}, 1, "bicycle"}, 
-    // {{250, 0, 30}, 13, "Bench"}, 
+    {{250, 0, 30}, 13, "Bench"}, 
     {{255, 179, 240}, 24, "Backpack"},
     // {{209, 0, 151}, 26, "handbag"}, 
     // {{0, 220, 176}, 28, "suitcase"}, 
@@ -19,19 +19,19 @@ const std::vector<ObjClass> obj_lib = {
     {{109, 63, 54}, 41, "Cup"}, 
     // {{84, 105, 51}, 45, "bowl"}, 
     {{153, 69, 1}, 56, "Chair"}, 
-    // {{3, 95, 161}, 57, "Couch"}, 
+    {{3, 95, 161}, 57, "Couch"}, 
     // {{163, 255, 0}, 58, "PottedPlant"}, 
     {{119, 0, 170}, 59, "Bed"}, 
     {{0, 182, 199}, 60, "Table"}, 
-    // {{0, 165, 120}, 61, "Toilet"}, 
+    {{0, 165, 120}, 61, "Toilet"}, 
     {{183, 130, 88}, 62, "TV"}, 
-    // {{95, 32, 0}, 63, "Laptop"}, 
-    // {{130, 114, 135}, 64, "Mouse"}, 
+    {{95, 32, 0}, 63, "Laptop"}, 
+    {{130, 114, 135}, 64, "Mouse"}, 
     // {{110, 129, 133}, 65, "Remote"}, 
     {{166, 74, 118}, 66, "Keyboard"}, 
     // {{219, 142, 185}, 67, "cell phone"}, 
     {{79, 210, 114}, 68, "Microwave"}, 
-    // {{178, 90, 62}, 69, "Oven"}, 
+    {{178, 90, 62}, 69, "Oven"}, 
     // {{65, 70, 15}, 70, "toaster"}, 
     // {{127, 167, 115}, 71, "Sink"}, 
     {{59, 105, 106}, 72, "Refrigerator"}, 
@@ -45,10 +45,10 @@ const std::vector<ObjClass> obj_lib = {
 };
 
 const std::vector<SemClass> sem_lib = {
-    {{92, 136, 89}, {87}, "Door"}, 
+    // {{92, 136, 89}, {87}, "Door"}, 
     {{209, 226, 140}, {122}, "Table"}, 
     // {{255, 160, 98}, {125}, "shelf"},
-    // {{134, 199, 156}, {121}, "Cabinet"},
+    {{134, 199, 156}, {121}, "Cabinet"},
     // {{218, 88, 184}, {123}, "floor"}, 
     {{96, 36, 108}, {88, 97, 98, 101, 124, 123}, "Floor"}, 
     // {{137, 54, 74}, {132}, "wall"}, 
@@ -548,36 +548,7 @@ void PCSegGeneratorNode::LabelPC ()
             auto object_it = instance_category_area_map.find(map_it->first);
             if (object_it != instance_category_area_map.end())
             {
-                // if (use_direct_fusion && (map_it->second > 0.4 * object_it->second.second)) 
-                // // && (map_it->second < 0.5 * sum_count))
-                // {
-                //     pcl::PointCloud<PointSurfelLabel>::Ptr extract_cloud (new pcl::PointCloud<PointSurfelLabel>);                    
-                //     extract_cloud->is_dense = false;
-                //     extract_cloud->sensor_origin_.setZero ();
-                //     extract_cloud->sensor_orientation_.w () = 0.0f;
-                //     extract_cloud->sensor_orientation_.x () = 1.0f;
-                //     extract_cloud->sensor_orientation_.y () = 0.0f;
-                //     extract_cloud->sensor_orientation_.z () = 0.0f; 
-                //     // extract_clouds.push_back(extract_cloud); 
-                //     extracted_instances.insert(std::make_pair(object_it->first, std::make_pair(object_it->second.first, extract_cloud)));
-
-                //     sum_count -= map_it->second;
-                // }
-                // else
-                // {
-                    if (map_it->second > max_count)
-                    {
-                        max_candidate = std::make_pair(object_it->first, object_it->second.first);
-                        max_count = map_it->second;
-                    }   
-                // }
-                // continue;
-            }
-
-            auto semantics_it = semantics_category_area_map.find(map_it->first);
-            if (semantics_it != semantics_category_area_map.end())
-            {
-                if (use_direct_fusion && (map_it->second > 0.6 * semantics_it->second.second))
+                if (use_direct_fusion && (map_it->second > 0.95 * object_it->second.second) && (map_it->second < 0.5 * sum_count)) 
                 // && (map_it->second < 0.5 * sum_count))
                 {
                     pcl::PointCloud<PointSurfelLabel>::Ptr extract_cloud (new pcl::PointCloud<PointSurfelLabel>);                    
@@ -588,7 +559,7 @@ void PCSegGeneratorNode::LabelPC ()
                     extract_cloud->sensor_orientation_.y () = 0.0f;
                     extract_cloud->sensor_orientation_.z () = 0.0f; 
                     // extract_clouds.push_back(extract_cloud); 
-                    extracted_instances.insert(std::make_pair(semantics_it->first, std::make_pair(semantics_it->second.first, extract_cloud)));
+                    extracted_instances.insert(std::make_pair(object_it->first, std::make_pair(object_it->second.first, extract_cloud)));
 
                     sum_count -= map_it->second;
                 }
@@ -596,11 +567,40 @@ void PCSegGeneratorNode::LabelPC ()
                 {
                     if (map_it->second > max_count)
                     {
+                        max_candidate = std::make_pair(object_it->first, object_it->second.first);
+                        max_count = map_it->second;
+                    }   
+                }
+                continue;
+            }
+
+            auto semantics_it = semantics_category_area_map.find(map_it->first);
+            if (semantics_it != semantics_category_area_map.end())
+            {
+                // if (use_direct_fusion && (map_it->second > 0.6 * semantics_it->second.second))
+                // // && (map_it->second < 0.5 * sum_count))
+                // {
+                //     pcl::PointCloud<PointSurfelLabel>::Ptr extract_cloud (new pcl::PointCloud<PointSurfelLabel>);                    
+                //     extract_cloud->is_dense = false;
+                //     extract_cloud->sensor_origin_.setZero ();
+                //     extract_cloud->sensor_orientation_.w () = 0.0f;
+                //     extract_cloud->sensor_orientation_.x () = 1.0f;
+                //     extract_cloud->sensor_orientation_.y () = 0.0f;
+                //     extract_cloud->sensor_orientation_.z () = 0.0f; 
+                //     // extract_clouds.push_back(extract_cloud); 
+                //     extracted_instances.insert(std::make_pair(semantics_it->first, std::make_pair(semantics_it->second.first, extract_cloud)));
+
+                //     sum_count -= map_it->second;
+                // }
+                // else
+                // {
+                    if (map_it->second > max_count)
+                    {
                         max_candidate = std::make_pair(semantics_it->first, semantics_it->second.first);
                         max_count = map_it->second;
                     }     
                     
-                }                
+                // }                
             }
         }
 

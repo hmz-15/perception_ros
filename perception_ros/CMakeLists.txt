@@ -28,8 +28,14 @@ find_package(catkin REQUIRED COMPONENTS
   approxmvbb_catkin
   pcl_catkin
   opencv3_catkin
-
 )
+
+find_package(Boost REQUIRED COMPONENTS thread filesystem system)
+find_package(OpenMP REQUIRED)
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -44,7 +50,6 @@ find_package(catkin REQUIRED COMPONENTS
 
 # find_package(PCL 1.3 REQUIRED COMPONENTS common io)
 
-find_package(OpenMP)
 
 # set(LIBS_PERCEPTION_ROS
 # ${OpenCV_LIBS}
@@ -177,10 +182,6 @@ target_link_libraries(${PROJECT_NAME}
 #   ${LIBS_PERCEPTION_ROS} 
   ${catkin_LIBRARIES}
 )
-
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(${PROJECT_NAME} PUBLIC OpenMP::OpenMP_CXX)
-endif()
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context

@@ -64,7 +64,6 @@
   <build_depend>pcl_conversions</build_depend>
   <build_depend>approxmvbb_catkin</build_depend>
   <build_depend>pcl_catkin</build_depend>
-  <build_depend>opencv3_catkin</build_depend>
   
   <!-- <build_depend>global_segment_map</build_depend> -->
 
@@ -81,7 +80,6 @@
   <build_export_depend>pcl_conversions</build_export_depend>
   <build_export_depend>approxmvbb_catkin</build_export_depend>
   <build_export_depend>pcl_catkin</build_export_depend>
-  <build_export_depend>opencv3_catkin</build_export_depend>
   <!-- <build_export_depend>global_segment_map</build_export_depend> -->
   
   <exec_depend>cv_bridge</exec_depend>

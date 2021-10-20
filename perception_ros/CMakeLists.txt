@@ -27,7 +27,6 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_conversions
   approxmvbb_catkin
   pcl_catkin
-  opencv3_catkin
 )
 
 find_package(Boost REQUIRED COMPONENTS thread filesystem system)
@@ -40,22 +39,15 @@ endif()
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
-# find_package(OpenCV 3.0 QUIET)
-# if(NOT OpenCV_FOUND)
-#    find_package(OpenCV 2.4.3 QUIET)
-#    if(NOT OpenCV_FOUND)
-#       message(FATAL_ERROR "OpenCV > 2.4.3 not found.")
-#    endif()
-# endif()
+find_package(OpenCV 3.0 QUIET)
+if(NOT OpenCV_FOUND)
+   find_package(OpenCV 2.4.3 QUIET)
+   if(NOT OpenCV_FOUND)
+      message(FATAL_ERROR "OpenCV > 2.4.3 not found.")
+   endif()
+endif()
 
 # find_package(PCL 1.3 REQUIRED COMPONENTS common io)
-
-
-# set(LIBS_PERCEPTION_ROS
-# ${OpenCV_LIBS}
-# ${EIGEN3_LIBS}
-# ${PCL_LIBRARIES}
-# )
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -149,7 +141,7 @@ catkin_package(
  INCLUDE_DIRS include include/depth_segmentation
  LIBRARIES {PROJECT_NAME}
  CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs seg_msgs message_filters image_transport tf
- pcl_ros pcl_conversions approxmvbb_catkin pcl_catkin opencv3_catkin
+ pcl_ros pcl_conversions approxmvbb_catkin pcl_catkin
 #  DEPENDS system_lib
 )
 
@@ -163,6 +155,7 @@ include_directories(
   include
   include/depth_segmentation
   ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIR}
 #  ${EIGEN3_INCLUDE_DIR}
 #  ${PCL_INCLUDE_DIRS}
 )
@@ -176,11 +169,9 @@ add_library(${PROJECT_NAME} SHARED
   src/depth_segmentation.cc
 )
 
-# add_dependencies(${PROJECT_NAME})
-
 target_link_libraries(${PROJECT_NAME}
-#   ${LIBS_PERCEPTION_ROS} 
   ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
 )
 
 ## Declare a C++ executable
@@ -191,30 +182,22 @@ add_executable(pc_seg_generator_node src/pc_seg_generator_node.cpp)
 add_dependencies(pc_seg_generator_node ${PROJECT_NAME})
 
 target_link_libraries(pc_seg_generator_node
-#   ${LIBS_PERCEPTION_ROS} 
   ${catkin_LIBRARIES} ${PROJECT_NAME}
+  ${OpenCV_LIBS}
 )
 
 add_executable(obj_align_test src/obj_align_test.cpp)
 
 target_link_libraries(obj_align_test
-#   ${LIBS_PERCEPTION_ROS} 
   ${catkin_LIBRARIES} ${PROJECT_NAME}
 )
 
 add_executable(image_test src/image_test.cpp)
 
 target_link_libraries(image_test
-#   ${LIBS_PERCEPTION_ROS} 
   ${catkin_LIBRARIES} ${PROJECT_NAME}
+  ${OpenCV_LIBS}
 )
-
-# add_executable(map_test src/map_processing_node.cpp)
-
-# target_link_libraries(map_test
-#    ${LIBS_PERCEPTION_ROS} 
-#    ${catkin_LIBRARIES} ${PROJECT_NAME}
-# )
 
 #############
 ## Install ##

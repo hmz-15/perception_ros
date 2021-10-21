@@ -29,10 +29,10 @@
         <param name="use_vrep" type="bool" value="$(arg use_vrep)"/>
         <!-- <param name="check_dynamic" type="bool" value="$(arg check_dynamic)"/> -->
         <param name="enable_openpose" type="bool" value="$(arg enable_openpose)" />
-        <param name="openpose_ip" type="str" value="192.168.1.139"/>
+        <param name="openpose_ip" type="str" value="0.0.0.0"/>
         <param name="openpose_port" type="int" value="8800"/>
         <param name="enable_detectron" type="bool" value="$(arg enable_detectron)" />
-        <param name="detectron_ip" type="str" value="192.168.1.139"/>
+        <param name="detectron_ip" type="str" value="0.0.0.0"/>
         <param name="detectron_port" type="int" value="8801"/>
         <param name="detectron_model" type="str" value="$(arg detectron_model)"/>
     </node>

@@ -198,7 +198,9 @@ class PerceptionNode(object):
         seg_msg.obj_id = obj_id
         seg_msg.obj_category = obj_category
         seg_msg.obj_scores = scores
-        seg_msg.obj_boxes = boxes
+
+        # 2D bounding boxes [x1 y1 x2 y2 ...]
+        seg_msg.obj_boxes = [int(i) for i in boxes]
 
         seg_msg.sem_id = sem_id
         seg_msg.sem_category = sem_category

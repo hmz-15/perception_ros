@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 
 #include "depth_segmentation/depth_segmentation.h"
+#include "opencv3_macro_adapt.h"
 
 #include <algorithm>
 #include <limits>

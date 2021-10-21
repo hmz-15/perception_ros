@@ -5,6 +5,8 @@
 #include <opencv2/rgbd.hpp>
 
 #include "depth_segmentation/common.h"
+#include "opencv3_macro_adapt.h"
+
 
 namespace PerceptionROS {
 

@@ -7,6 +7,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/photo/photo.hpp>
 
+#include "opencv3_macro_adapt.h"
+
 
 int main(int argc, char **argv)
 {

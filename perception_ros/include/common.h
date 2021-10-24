@@ -59,36 +59,11 @@ struct Sem2D{
     std::string cate_name;
 };
 
-struct ObjClass{
-    cv::Vec3b color;
-    int category_id;
+struct PanoClass{
     std::string name;
-};
-
-struct SemClass{
-    cv::Vec3b color;
     std::vector<int> category_id;
-    std::string name;
+    cv::Vec3b color;
 };
-
-struct Obj3D{
-    int id;
-    // int category;
-    std::string category_name;
-    Eigen::Vector3f pos;
-    Eigen::Vector3f aligned_dim; // x,y,z in world frame
-    Eigen::Quaternionf quat; // x,y,z,w
-    std::vector<Eigen::Vector4f> planes; // a,b,c,d
-    pcl::PolygonMesh::Ptr mesh;
-};
-
-struct ObjCAD{
-    std::string cad_id;
-    std::string category_name;
-    std::vector<Eigen::Vector4f> planes;
-    Eigen::Vector3f aligned_dim;
-};
-
 
 enum GeometricSegMode{
     kDepth = 0,

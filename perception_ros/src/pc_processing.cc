@@ -4,7 +4,7 @@
 namespace PerceptionROS
 {
 
-PCProcessor::PCProcessor(ros::NodeHandle& node_handle, bool visualize_geo_seg, bool save_img): if_visualize(visualize_geo_seg), if_save_img(save_img)
+PCProcessor::PCProcessor(ros::NodeHandle& node_handle, bool visualize_geo_seg): if_visualize(visualize_geo_seg)
 {
     // load params
     node_handle.param<float>("lccp/voxel_resolution", lccp_param_.voxel_resolution, 0.008f);
@@ -249,12 +249,6 @@ void PCProcessor::GeneratePCSem (const cv::Mat& imRGB, const cv::Mat& imDepth, c
                     }
                     else if(label == seg_id[k])
                     {
-                        // if (cate_id[k] == 56 || cate_id[k] == 72|| cate_id[k] == 87){
-                        // pt.x = pt.y = pt.z = bad_point;  
-                        //   mask.at<uchar>(v,u) = 0; 
-                        // }
-                        // else
-                        // {
                         pt.z = imDepth.at<float>(v,u);
                         pt.x = static_cast<float> (u - centerX) * pt.z * inv_fx;
                         pt.y = static_cast<float> (v - centerY) * pt.z * inv_fy;
@@ -268,7 +262,6 @@ void PCProcessor::GeneratePCSem (const cv::Mat& imRGB, const cv::Mat& imDepth, c
                         pt.semantic_label = (uint8_t)(cate_id[k]);
 
                         mask.at<uchar>(v,u) = 0; 
-                        // }
                     }
                     else
                         pt.x = pt.y = pt.z = bad_point; 
@@ -301,7 +294,7 @@ void PCProcessor::GeneratePCSem (const cv::Mat& imRGB, const cv::Mat& imDepth, c
                         pt.b = imRGB.at<cv::Vec3b>(v,u)[2];
                         pt.a = 255;
                         pt.instance_label = 0u;
-                        pt.semantic_label = 80u;
+                        pt.semantic_label = background_label;
                     }
                 }
             }
@@ -388,63 +381,6 @@ void PCProcessor::FilterPCEuclidean(pcl::PointCloud<PointSurfelLabel>::Ptr& clou
             *cloud_filtered = *cloud;      
             std::cout << "Fail to perform Euclidean Clustering" << std::endl;
         }
-            
-    // PointSurfelLabel pt_min;
-    // PointSurfelLabel pt_max;
-    // PointSurfelLabel pt_mean;
-    // pcl::getMinMax3D(*(clouds[i]), pt_min, pt_max);
-
-    // float z_min = pt_min.z;
-    // float z_max = pt_max.z;
-
-    // pcl::computeCentroid(*(clouds[i]), pt_mean);
-    // float z_mean = pt_mean.z;
-
-    // float low_b = z_mean - (z_mean - z_min)*0.95;
-    // float high_b = z_mean + (z_mean - z_min)*0.9;
-
-    // Eigen::Matrix3f cov;
-    // Eigen::Vector4f mean;
-    // pcl::computeMeanAndCovarianceMatrix	(*(clouds[i]),cov,mean); 	
-    // Eigen::Vector4f std;
-    // std(0) = std::sqrt(cov(0,0));
-    // std(1) = std::sqrt(cov(1,1));
-    // std(2) = std::sqrt(cov(2,2));
-
-    // Eigen::Vector4f low_b = mean - 1.7*std;
-    // Eigen::Vector4f high_b = mean + 1.7*std;
-
-    // // z distance
-    // pcl::ConditionAnd<PointSurfelLabel>::Ptr range_cond (new pcl::ConditionAnd<PointSurfelLabel> ());
-    // range_cond->addComparison (pcl::FieldComparison<PointSurfelLabel>::ConstPtr (new
-    //  pcl::FieldComparison<PointSurfelLabel> ("z", pcl::ComparisonOps::GT, low_b(2))));
-    // range_cond->addComparison (pcl::FieldComparison<PointSurfelLabel>::ConstPtr (new
-    //   pcl::FieldComparison<PointSurfelLabel> ("z", pcl::ComparisonOps::LT, high_b(2))));
-    // // x distance
-    // range_cond->addComparison (pcl::FieldComparison<PointSurfelLabel>::ConstPtr (new
-    //  pcl::FieldComparison<PointSurfelLabel> ("x", pcl::ComparisonOps::GT, low_b(0))));
-    // range_cond->addComparison (pcl::FieldComparison<PointSurfelLabel>::ConstPtr (new
-    //   pcl::FieldComparison<PointSurfelLabel> ("x", pcl::ComparisonOps::LT, high_b(0))));
-    // // y distance
-    // range_cond->addComparison (pcl::FieldComparison<PointSurfelLabel>::ConstPtr (new
-    //  pcl::FieldComparison<PointSurfelLabel> ("y", pcl::ComparisonOps::GT, low_b(1))));
-    // range_cond->addComparison (pcl::FieldComparison<PointSurfelLabel>::ConstPtr (new
-    //   pcl::FieldComparison<PointSurfelLabel> ("y", pcl::ComparisonOps::LT, high_b(1))));
-    // // build the filter
-    // pcl::ConditionalRemoval<PointSurfelLabel> condrem;
-    // condrem.setCondition (range_cond);
-    // condrem.setInputCloud (clouds[i]);
-    // condrem.setKeepOrganized(true);
-    // // apply filter
-    // condrem.filter (*(clouds[i]));
-
-
-    // Create the filtering object
-    // pcl::StatisticalOutlierRemoval<PointSurfelLabel> sor;
-    // sor.setInputCloud (clouds[i]);
-    // sor.setMeanK (10);
-    // sor.setStddevMulThresh (1.0);
-    // sor.filter (*(clouds[i]));
     }
 }
 

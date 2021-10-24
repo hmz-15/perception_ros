@@ -1,0 +1,12 @@
+use_semantic_segmentation: true
+use_geometric_segmentation: true
+
+use_distance_check: true
+use_direct_fusion: true
+
+geo_seg_mode: 0 # 0 for depth and 1 for point cloud (always use 0 to get a good result)
+visualize_geo_seg: false
+visualize_pano_seg: false
+visualize_fusion_seg: true
+
+pub_seg_img: true

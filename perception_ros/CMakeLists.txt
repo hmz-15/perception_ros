@@ -25,7 +25,6 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   pcl_ros
   pcl_conversions
-  approxmvbb_catkin
   pcl_catkin
 )
 
@@ -36,8 +35,6 @@ if (OPENMP_FOUND)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
 
 find_package(OpenCV 4.0 QUIET)
 if(NOT OpenCV_FOUND)
@@ -144,7 +141,7 @@ catkin_package(
  INCLUDE_DIRS include include/depth_segmentation
  LIBRARIES {PROJECT_NAME}
  CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs seg_msgs message_filters image_transport tf
- pcl_ros pcl_conversions approxmvbb_catkin pcl_catkin
+ pcl_ros pcl_conversions pcl_catkin
 #  DEPENDS system_lib
 )
 
@@ -187,12 +184,6 @@ add_dependencies(pc_seg_generator_node ${PROJECT_NAME})
 target_link_libraries(pc_seg_generator_node
   ${catkin_LIBRARIES} ${PROJECT_NAME}
   ${OpenCV_LIBS}
-)
-
-add_executable(obj_align_test src/obj_align_test.cpp)
-
-target_link_libraries(obj_align_test
-  ${catkin_LIBRARIES} ${PROJECT_NAME}
 )
 
 add_executable(image_test src/image_test.cpp)

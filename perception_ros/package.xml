@@ -2,19 +2,19 @@
 <package format="2">
   <name>perception_ros</name>
   <version>0.0.0</version>
-  <description>The perception_ros package</description>
+  <description>A ros package for per-frame image / point cloud processing</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
-  <maintainer email="zeyu@todo.todo">zeyu</maintainer>
-  <maintainer email="muzhi@todo.todo">muzhi</maintainer>
+  <maintainer email="zeyuz@outlook.com">Zeyu Zhang</maintainer>
+  <maintainer email="muzhihan@g.ucla.edu">Muzhi Han</maintainer>
 
 
   <!-- One license tag required, multiple allowed, one license per tag -->
   <!-- Commonly used license strings: -->
   <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
-  <license>TODO</license>
+  <license>BSD</license>
 
 
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
@@ -62,10 +62,7 @@
   <build_depend>tf</build_depend>
   <build_depend>pcl_ros</build_depend>
   <build_depend>pcl_conversions</build_depend>
-  <build_depend>approxmvbb_catkin</build_depend>
   <build_depend>pcl_catkin</build_depend>
-  
-  <!-- <build_depend>global_segment_map</build_depend> -->
 
   <build_export_depend>cv_bridge</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
@@ -78,9 +75,7 @@
   <build_export_depend>tf</build_export_depend>
   <build_export_depend>pcl_ros</build_export_depend>
   <build_export_depend>pcl_conversions</build_export_depend>
-  <build_export_depend>approxmvbb_catkin</build_export_depend>
   <build_export_depend>pcl_catkin</build_export_depend>
-  <!-- <build_export_depend>global_segment_map</build_export_depend> -->
   
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>roscpp</exec_depend>
@@ -93,8 +88,6 @@
   <exec_depend>tf</exec_depend>
   <exec_depend>pcl_ros</exec_depend>
   <exec_depend>pcl_conversions</exec_depend>
-  <exec_depend>approxmvbb_catkin</exec_depend>
-  <!-- <exec_depend>global_segment_map</exec_depend> -->
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

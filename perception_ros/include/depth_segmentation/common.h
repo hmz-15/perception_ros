@@ -1,3 +1,8 @@
+// BSD 3-Clause License
+
+// Copyright (c) 2019, ETHZ ASL
+// All rights reserved.
+
 #ifndef DEPTH_SEGMENTATION_COMMON_H_
 #define DEPTH_SEGMENTATION_COMMON_H_
 

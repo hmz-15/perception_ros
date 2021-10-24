@@ -32,9 +32,6 @@ public:
 
     // camera info callback to initialize camera intrinsics
     void CamInfoCallback (const sensor_msgs::CameraInfoConstPtr& msgInfo);
-
-    // void SegCallback (const seg_msgs::SegConstPtr& msgSeg);
-
     void SetCamInfo();
 
     // process messages
@@ -42,10 +39,10 @@ public:
     void ProcessSegMsg (const seg_msgs::SegConstPtr& msgSeg);
     
     void Update();
-
     void LabelPC();
 
-    cv::Mat DrawInstSeg();
+    cv::Mat DrawPanoSeg();
+    int GetMappedSemanticLabel(int label_in);
 
 
 private:
@@ -90,25 +87,26 @@ private:
     cv::Mat imDepth;
     cv::Mat imSeg;
 
+    // Panoptic seg info
+    std::unordered_map<int, int> class_id_mapping; // we use a single class id for one semantic class (as string)
+    std::vector<PanoClass> pano_class_lib;
+    std::vector<int> obj_class_id;
+    std::vector<std::string> dyn_obj_class;
+
     // Detection results
-    std::vector<Obj2D> objects = {};
-    std::vector<Sem2D> semantics = {}; 
-    std::vector<int> mov_list = {};
-    std::unordered_map<int, std::pair<int, int>> instance_category_area_map = {};
-    std::unordered_map<int, std::pair<int, int>> semantics_category_area_map = {};
-    // std::map<int, int> instance_area_pairs = {};
-    // std::map<int, int> semantics_category_pairs = {};
+    std::vector<Obj2D> objects;
+    std::vector<Sem2D> semantics; 
+    std::vector<int> mov_list;
+    std::unordered_map<int, std::pair<int, int>> instance_category_area_map;
+    std::unordered_map<int, std::pair<int, int>> semantics_category_area_map;
 
     // Point cloud segments
-    std::vector<pcl::PointCloud<PointSurfelLabel>::Ptr> clouds = {};
+    std::vector<pcl::PointCloud<PointSurfelLabel>::Ptr> clouds;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
-
-    // tf listener
-    // tf::TransformListener tf_listener_;
 
     // Publishers
     ros::Publisher point_cloud_segment_publisher_;
-    ros::Publisher inst_seg_image_publisher_;
+    ros::Publisher pano_seg_image_publisher_;
 
     // Node handle
     ros::NodeHandle node_handle_;

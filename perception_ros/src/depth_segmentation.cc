@@ -28,7 +28,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
-
+#include "utils.h"
 #include "depth_segmentation/depth_segmentation.h"
 #include "opencv3_macro_adapt.h"
 
@@ -41,8 +41,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #include <opencv2/photo/photo.hpp>
 
 namespace PerceptionROS {
-
-    int NFrame;
 
 namespace depth_segmentation {
 
@@ -989,9 +987,9 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
 
   if (if_save_img)
   {
-      std::string path = ros::package::getPath("perception_ros");
       cv::Mat geo_seg_save = output.clone();
-      cv::imwrite(path + "/image/geo_seg/" + std::to_string(NFrame)+".jpg",geo_seg_save);
+      makePath(output_folder + "/image/geo_seg/", 0777);
+      cv::imwrite(output_folder + "/image/geo_seg/" + std::to_string(NFrame)+".jpg",geo_seg_save);
   }
     
   *labeled_map = output;
@@ -1005,7 +1003,7 @@ void DepthSegmenter::segmentsToPC(const std::vector<Segment>& segments, std::vec
         pcl::PointCloud<PointSurfelLabel>::Ptr segment_pcl(new pcl::PointCloud<PointSurfelLabel>);
         for (std::size_t i = 0u; i < segment.points.size(); ++i) {
             PointSurfelLabel point_pcl;
-            uint8_t semantic_label = 80u;
+            uint8_t semantic_label = background_label;
             uint8_t instance_label = 0u;
 
             fillPoint(segment.points[i], segment.normals[i], segment.original_colors[i],

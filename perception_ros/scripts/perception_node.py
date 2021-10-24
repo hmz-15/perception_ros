@@ -9,7 +9,7 @@ from sensor_msgs.msg import Image, CameraInfo
 from seg_msgs.msg import Seg
 
 from tcp_client import TcpClient
-from utils import pack_img, bin2openpose, bin2detectron
+from utils import pack_img, bin2detectron
 
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 
@@ -18,38 +18,24 @@ class PerceptionNode(object):
 
     def __init__(
         self,
-        use_vrep,
-        # check_dynamic,
-        enable_openpose,
-        openpose_ip,
-        openpose_port,
+        flip_depth,
         enable_detectron,
         detectron_ip,
         detectron_port,
         detectron_model
     ):
-        # rospy.Subscriber("/camera/rgb/image_raw", Image, self.perceive_)
         
-        self.use_vrep_ = use_vrep
-        # self.check_dynamic_ = check_dynamic
-        self.enable_openpose_ = enable_openpose
-        self.op_client_ = TcpClient(ip=openpose_ip, port=openpose_port)
+        self.flip_depth_ = flip_depth
 
         self.enable_detectron_ = enable_detectron
         self.dt_client_ = TcpClient(ip=detectron_ip, port=detectron_port)
         self.dt_model_ = detectron_model
-
-        # if not check_dynamic:
-        #     self.enable_openpose_ = False
-        #     self.enable_detectron_ = False
-
 
         self.rgb_sub_ = Subscriber('/camera/rgb/image_raw', Image)
         self.depth_sub_ = Subscriber('/camera/depth/image_raw', Image)
         self.rgb_info_sub_ = Subscriber('/camera/rgb/camera_info', CameraInfo)
         self.depth_info_sub_ = Subscriber('/camera/depth/camera_info', CameraInfo)
 
-        # self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.rgb_info_sub_, self.depth_info_sub_], queue_size=1, slop=0.05)
         self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.rgb_info_sub_], queue_size=10, slop=0.2)
         self.syn_sub_.registerCallback(self.perceive_)
 
@@ -70,7 +56,6 @@ class PerceptionNode(object):
         self.flag_ = False  # if new message comes
 
 
-
     def __def__(self):
         pass
 
@@ -80,7 +65,7 @@ class PerceptionNode(object):
             
             if not self.rgb_image_ == None and self.flag_:
                 self.flag_ = False
-                start = rospy.get_time()
+                # start = rospy.get_time()
 
                 img = self.bridge_.imgmsg_to_cv2(self.rgb_image_)
                 height, width, channels = img.shape
@@ -88,30 +73,21 @@ class PerceptionNode(object):
                 
                 # Get detection result
                 img_bin = pack_img(img)
-                # print("input")
-
-                if self.enable_openpose_:
-                    self.pub_op_(img_bin, time)
-
                 
                 if self.enable_detectron_:
                     self.pub_dt_(img_bin, time)
-
-
-                end = rospy.get_time()
+                # end = rospy.get_time()
                 # print(end-start)
 
     
-    # def perceive_(self, rgb_img, depth_img, rgb_info, depth_info):
     def perceive_(self, rgb_img, depth_img, rgb_info):
         # print("percieve")
             
         self.rgb_image_ = rgb_img
         self.depth_image_ = depth_img
         self.rgb_info_ = rgb_info
-        # self.depth_info_ = depth_info 
 
-        if self.use_vrep_:
+        if self.flip_depth_:
             dep_img = self.bridge_.imgmsg_to_cv2(depth_img, desired_encoding="16UC1")
             dep_flip_img = cv2.flip(dep_img, 0)
             depth_flip_img_ = self.bridge_.cv2_to_imgmsg(dep_flip_img, encoding="16UC1")
@@ -127,9 +103,8 @@ class PerceptionNode(object):
         # Publish frame
         self.rgb_pub.publish(rgb_img)
         self.rgb_info_pub.publish(rgb_info)
-        # self.depth_info_pub.publish(depth_info_)
 
-        if self.use_vrep_:
+        if self.flip_depth_:
             self.depth_pub.publish(depth_flip_img_)
         else:
             self.depth_pub.publish(depth_img)
@@ -137,16 +112,11 @@ class PerceptionNode(object):
         self.flag_ = True
 
 
-
-
     def pub_dt_(self, img_bin, time_):
         start = rospy.get_time()
         resp_bin = self.dt_client_.send(img_bin)
-        # print("output")
-        # print(len(resp_bin))
         resp = bin2detectron(resp_bin, self.dt_model_)
         end = rospy.get_time()
-
         # print("Received Detectron Result")
         # print(end-start)
         # print(resp)
@@ -206,23 +176,11 @@ class PerceptionNode(object):
                         
         self.dt_pub.publish(seg_msg)
 
-    
-    def pub_op_(self, img_bin, time_):
-        resp_bin = self.op_client_.send(img_bin)
-        resp = bin2openpose(resp_bin)
-        print("Received Openpose Result")
-
-
 
 if __name__ == "__main__":
     rospy.init_node("robot_perception_node")
 
-    use_vrep = rospy.get_param("~use_vrep", False)
-    # check_dynamic = rospy.get_param("~check_dynamic", False)
-    enable_openpose = rospy.get_param("~enable_openpose", False)
-    openpose_ip = rospy.get_param("~openpose_ip", "0.0.0.0")
-    openpose_port = rospy.get_param("~openpose_port", 8800)
-
+    flip_depth = rospy.get_param("~flip_depth", False)
     enable_detectron = rospy.get_param("~enable_detectron", False)
     detectron_ip = rospy.get_param("~detectron_ip", "0.0.0.0")
     detectron_port = rospy.get_param("~detectron_port", 8801)
@@ -232,11 +190,7 @@ if __name__ == "__main__":
     print(detectron_model)
 
     node = PerceptionNode(
-        use_vrep=use_vrep,
-        # check_dynamic=check_dynamic,
-        enable_openpose=enable_openpose,
-        openpose_ip=openpose_ip,
-        openpose_port=openpose_port,
+        flip_depth=flip_depth,
         enable_detectron=enable_detectron,
         detectron_ip=detectron_ip,
         detectron_port=detectron_port,

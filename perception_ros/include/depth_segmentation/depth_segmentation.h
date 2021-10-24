@@ -1,3 +1,8 @@
+// BSD 3-Clause License
+
+// Copyright (c) 2019, ETHZ ASL
+// All rights reserved.
+
 #ifndef DEPTH_SEGMENTATION_DEPTH_SEGMENTATION_H_
 #define DEPTH_SEGMENTATION_DEPTH_SEGMENTATION_H_
 
@@ -11,6 +16,8 @@
 namespace PerceptionROS {
 
     extern int NFrame;
+    extern uchar background_label;
+    extern std::string output_folder;
 
 namespace depth_segmentation {
 

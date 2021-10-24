@@ -1,76 +1,24 @@
 #include "common.h"
+#include "utils.h"
 #include "pc_seg_generator_node.h"
 #include "depth_segmentation/depth_segmentation.h"
 
+#include <XmlRpcValue.h>
 
 namespace PerceptionROS
 {
 
-const std::vector<ObjClass> obj_lib = {
-    // rgb color, class id, class name
-    {{220, 20, 60}, 0, "Person"}, 
-    // {{119, 11, 32}, 1, "bicycle"}, 
-    {{250, 0, 30}, 13, "Bench"}, 
-    {{255, 179, 240}, 24, "Backpack"},
-    // {{209, 0, 151}, 26, "handbag"}, 
-    // {{0, 220, 176}, 28, "suitcase"}, 
-    {{197, 226, 255}, 39, "Bottle"}, 
-    // {{171, 134, 1}, 40, "wine glass"}, 
-    {{109, 63, 54}, 41, "Cup"}, 
-    // {{84, 105, 51}, 45, "bowl"}, 
-    {{153, 69, 1}, 56, "Chair"}, 
-    {{3, 95, 161}, 57, "Couch"}, 
-    // {{163, 255, 0}, 58, "PottedPlant"}, 
-    {{119, 0, 170}, 59, "Bed"}, 
-    {{0, 182, 199}, 60, "Table"}, 
-    {{0, 165, 120}, 61, "Toilet"}, 
-    {{183, 130, 88}, 62, "TV"}, 
-    {{95, 32, 0}, 63, "Laptop"}, 
-    {{130, 114, 135}, 64, "Mouse"}, 
-    // {{110, 129, 133}, 65, "Remote"}, 
-    {{166, 74, 118}, 66, "Keyboard"}, 
-    // {{219, 142, 185}, 67, "cell phone"}, 
-    {{79, 210, 114}, 68, "Microwave"}, 
-    {{178, 90, 62}, 69, "Oven"}, 
-    // {{65, 70, 15}, 70, "toaster"}, 
-    // {{127, 167, 115}, 71, "Sink"}, 
-    {{59, 105, 106}, 72, "Refrigerator"}, 
-    {{142, 108, 45}, 73, "Book"}
-    // {{196, 172, 0}, 74, "Clock"}, 
-    // {{95, 54, 80}, 75, "vase"}, 
-    // {{128, 76, 255}, 76, "scissors"}, 
-    // {{201, 57, 1}, 77, "teddy bear"}
-    // {{246, 0, 122}, 78, "hair drier"}, 
-    // {{191, 162, 208}, 79, "toothbrush"}
-};
-
-const std::vector<SemClass> sem_lib = {
-    // {{92, 136, 89}, {87}, "Door"}, 
-    {{209, 226, 140}, {122}, "Table"}, 
-    // {{255, 160, 98}, {125}, "shelf"},
-    {{134, 199, 156}, {121}, "Cabinet"},
-    // {{218, 88, 184}, {123}, "floor"}, 
-    {{96, 36, 108}, {88, 97, 98, 101, 124, 123}, "Floor"}, 
-    // {{137, 54, 74}, {132}, "wall"}, 
-    {{102, 102, 156}, {110, 111, 112, 113, 132}, "Wall"},
-    // {{183, 121, 142}, {115, 116}, "window"},
-    {{146, 139, 141}, {119}, "Ceiling"}
-    // {{146, 139, 0}, {119}, "ceiling"}
-};
-
-const std::vector<int> pre_dynamic_obj = {0}; //Person category ID
-
 int NFrame = 0;
-
+uchar background_label;
+std::string output_folder;
 
 PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handle_(node_handle)
 {
-
     cloud.reset(new pcl::PointCloud<pcl::PointXYZRGB>);
-
     Update();
 
     // load rosparam
+    node_handle_.param<std::string>("output_folder", output_folder, ros::package::getPath("perception_ros")+"/output");
     node_handle_.param<bool>("use_semantic_segmentation", use_semantic_segmentation, false);
     node_handle_.param<bool>("use_geometric_segmentation", use_geometric_segmentation, false);
     node_handle_.param<bool>("use_distance_check", use_distance_check, false);
@@ -83,8 +31,76 @@ PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handl
     node_handle_.param<bool>("visualize_fusion_seg", visualize_fusion_seg, false);
     node_handle_.param<bool>("pub_seg_img", pub_seg_img, false);
     node_handle_.param<bool>("save_img", save_img, false);
-
     node_handle_.param<bool>("verbose", verbose, true);
+
+    // pano class
+    XmlRpc::XmlRpcValue pano_class_list;
+    node_handle_.param<XmlRpc::XmlRpcValue>("pano_seg_class", pano_class_list, {});
+    for (auto it = pano_class_list.begin(); it != pano_class_list.end(); it++)
+    {
+        PanoClass pano_class = PanoClass();
+        pano_class.name = static_cast<std::string>(it->first);
+
+        std::vector<int> cate_id_vec;
+        for (int i = 0; i < it->second.size(); i++)
+        {
+            int id = static_cast<int>(it->second[i]);
+            cate_id_vec.push_back(id);
+            class_id_mapping.insert(std::make_pair(id, cate_id_vec[0]));
+        }
+        pano_class.category_id = cate_id_vec;
+        pano_class_lib.push_back(pano_class);
+    }
+
+    // object class with color
+    XmlRpc::XmlRpcValue obj_class_list;
+    node_handle_.param<XmlRpc::XmlRpcValue>("obj_class_with_color", obj_class_list, {});
+    for (auto it = obj_class_list.begin(); it != obj_class_list.end(); it++)
+    {
+        std::string category_name = static_cast<std::string>(it->first);
+        auto pano_it = std::find_if(pano_class_lib.begin(), pano_class_lib.end(),
+            [=] (const PanoClass& f) { return (f.name == category_name); });
+        if (pano_it == pano_class_lib.end())
+            ROS_ERROR("Mismatch between pano_seg_class and obj_class_with_color: ", category_name);
+        else
+        {
+            uchar r = static_cast<uchar>(static_cast<int>(it->second[0]));
+            uchar g = static_cast<uchar>(static_cast<int>(it->second[1]));
+            uchar b = static_cast<uchar>(static_cast<int>(it->second[2]));
+            cv::Vec3b color = {r, g, b};
+            pano_it->color = color;            
+        }
+        for (const auto& id: pano_it->category_id)
+            obj_class_id.push_back(id);
+    }
+    
+    // sem class with color
+    XmlRpc::XmlRpcValue sem_class_list;
+    node_handle_.param<XmlRpc::XmlRpcValue>("sem_class_with_color", sem_class_list, {});
+    for (auto it = sem_class_list.begin(); it != sem_class_list.end(); it++)
+    {
+        std::string category_name = static_cast<std::string>(it->first);
+        auto pano_it = std::find_if(pano_class_lib.begin(), pano_class_lib.end(),
+            [=] (const PanoClass& f) { return (f.name == category_name); });
+        if (pano_it == pano_class_lib.end())
+            ROS_ERROR("Mismatch between pano_seg_class and sem_class_with_color: ", category_name);
+        else
+        {
+            uchar r = static_cast<uchar>(static_cast<int>(it->second[0]));
+            uchar g = static_cast<uchar>(static_cast<int>(it->second[1]));
+            uchar b = static_cast<uchar>(static_cast<int>(it->second[2]));
+            cv::Vec3b color = {r, g, b};
+            pano_it->color = color;            
+        }
+    }
+
+    // dynamic object class
+    node_handle_.param<std::vector<std::string>>("dynamic_obj_class", dyn_obj_class, {});
+
+    // background label
+    int bg_label;
+    node_handle_.param<int>("background_label", bg_label, 80);
+    background_label = static_cast<uchar>(bg_label);
 
     // image subscriber
     rgb_subscriber_ = new message_filters::Subscriber<sensor_msgs::Image> (node_handle_, "/perception/rgb_image", 100);
@@ -106,10 +122,9 @@ PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handl
 
     // camera info subscriber
     info_sub_ = node_handle_.subscribe("/perception/rgb_info", 5, &PCSegGeneratorNode::CamInfoCallback, this);
-    // (TODO) remap the camerainfo topic in the launch file
 
     point_cloud_segment_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>("/perception/seg_point_cloud", 100);
-    inst_seg_image_publisher_ = node_handle_.advertise<sensor_msgs::Image>("/perception/inst_seg", 100);
+    pano_seg_image_publisher_ = node_handle_.advertise<sensor_msgs::Image>("/perception/pano_seg", 100);
 
     // initialize segmentor
     if (use_geometric_segmentation)
@@ -118,7 +133,7 @@ PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handl
         if (geo_seg_mode == GeometricSegMode::kPointCloud)
         {
             ROS_INFO("Use Point Cloud segmentation!");
-            mpc_processor = new PCProcessor(node_handle_, visualize_geo_seg, save_img);
+            mpc_processor = new PCProcessor(node_handle_, visualize_geo_seg);
         }
         else if (geo_seg_mode == GeometricSegMode::kDepth)
         {
@@ -135,7 +150,7 @@ PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handl
     else
     {
         ROS_INFO("Disable geometric segmentation!");
-        mpc_processor = new PCProcessor(node_handle_, visualize_geo_seg, save_img);
+        mpc_processor = new PCProcessor(node_handle_, visualize_geo_seg);
     }
 
     ROS_INFO("Waiting for camera info...");
@@ -284,26 +299,16 @@ void PCSegGeneratorNode::SetCamInfo()
 }
     
 
-
 void PCSegGeneratorNode::Update()
 {
     // Publish point cloud segments
-    // std::cout<<"cloud size " <<clouds.size()<<std::endl;
-    // if (clouds.size() == 1)
-    //     std::cout<<"hamsterhamster!" <<std::endl;
     for (int i = 0; i < clouds.size(); i++)
     {
-        // if (i == 0)
-        // {
-        // if (clouds[i]->points.size() < 1000)
-        //     continue;
-        // std::cout << "clouds " << (int)clouds[i]->points[0].semantic_label << " " << (int)clouds[i]->points[0].instance_label <<std::endl;
         sensor_msgs::PointCloud2 pcl2_msg;
         pcl::toROSMsg(*(clouds[i]), pcl2_msg);
         pcl2_msg.header.stamp = current_frame_time_;
         pcl2_msg.header.frame_id = camera_frame_id_;
         point_cloud_segment_publisher_.publish(pcl2_msg);
-        // }
     }
 
     if (!(use_semantic_segmentation || use_geometric_segmentation))
@@ -317,12 +322,12 @@ void PCSegGeneratorNode::Update()
 
     if (pub_seg_img)
     {
-        cv::Mat seg_img = DrawInstSeg();
+        cv::Mat seg_img = DrawPanoSeg();
         std_msgs::Header header;
         header.stamp = current_frame_time_;
         header.frame_id = camera_frame_id_;
-        const sensor_msgs::ImagePtr inst_seg_image_msg = cv_bridge::CvImage(header, "rgb8", seg_img).toImageMsg();  // rviz uses rgb as default
-        inst_seg_image_publisher_.publish(inst_seg_image_msg);
+        const sensor_msgs::ImagePtr pano_seg_image_msg = cv_bridge::CvImage(header, "rgb8", seg_img).toImageMsg();  // rviz uses rgb as default
+        pano_seg_image_publisher_.publish(pano_seg_image_msg);
     }
 
     // Clear variables
@@ -377,9 +382,7 @@ void PCSegGeneratorNode::ProcessImageMsg (const sensor_msgs::ImageConstPtr& msgR
     if (save_img)
     {
         if (verbose)
-            ROS_INFO("Save image!");
-        std::string path = ros::package::getPath("perception_ros");
-        
+            ROS_INFO("Save image!");        
         cv::Mat depth_save = (cv_ptrD->image).clone();
         if (cv_ptrD->encoding != sensor_msgs::image_encodings::TYPE_16UC1)
         {
@@ -390,10 +393,11 @@ void PCSegGeneratorNode::ProcessImageMsg (const sensor_msgs::ImageConstPtr& msgR
         cv::Mat rgb_save = imRGB.clone();
         cv::cvtColor(imRGB, rgb_save, CV_RGB2BGR);  // opencv uses bgr as default
 
-        cv::imwrite(path + "/image/rgb/" + std::to_string(NFrame)+".jpg",rgb_save);
-        cv::imwrite(path + "/image/depth/" + std::to_string(NFrame)+".png",depth_save);
+        makePath(output_folder + "/image/rgb/", 0777);
+        makePath(output_folder + "/image/depth/", 0777);
+        cv::imwrite(output_folder + "/image/rgb/" + std::to_string(NFrame)+".jpg", rgb_save);
+        cv::imwrite(output_folder + "/image/depth/" + std::to_string(NFrame)+".png", depth_save);
     }
-
 }
 
 
@@ -410,13 +414,12 @@ void PCSegGeneratorNode::ProcessSegMsg (const seg_msgs::SegConstPtr& msgSeg)
 
     // Process object detection result
     int obj_num = seg_result.obj_id.size();
-    // auto pred = [id](const ObjClass & obj) {return obj.category_id == id;};
     for (int i = 0; i < obj_num; i++)
     {
         int cate_id = seg_result.obj_category[i];
-        auto it = std::find_if(obj_lib.begin(), obj_lib.end(),
-            [=] (const ObjClass& f) { return (f.category_id == cate_id); });
-        if (it == obj_lib.end())
+        auto it = std::find_if(pano_class_lib.begin(), pano_class_lib.end(),
+            [=] (const PanoClass& f) { return (std::find(f.category_id.begin(), f.category_id.end(),cate_id) != f.category_id.end()); });
+        if (it == pano_class_lib.end())
             continue;
 
         int x1 = seg_result.obj_boxes[4*i];
@@ -431,15 +434,14 @@ void PCSegGeneratorNode::ProcessSegMsg (const seg_msgs::SegConstPtr& msgSeg)
         obj.is_dynamic = false;
 
         // Random color for instance
-        // obj.color = (*it).color;
         cv::Vec3b color(rand() % 255,rand() % 255,rand() % 255);
         obj.color = color;
 
         obj.box = cv::Rect(x1,y1,x2-x1,y2-y1);
         obj.area = (x2-x1)*(y2-y1);
-        obj.cate_name = (*it).name;
+        obj.cate_name = it->name;
 
-        if (find(pre_dynamic_obj.begin(), pre_dynamic_obj.end(), obj.category) != pre_dynamic_obj.end())
+        if (std::find(dyn_obj_class.begin(), dyn_obj_class.end(), obj.cate_name) != dyn_obj_class.end())
         {
             obj.is_dynamic = true;  
             mov_list.push_back(obj.id);
@@ -452,34 +454,27 @@ void PCSegGeneratorNode::ProcessSegMsg (const seg_msgs::SegConstPtr& msgSeg)
                     area_accurate += ((int)imSeg.at<uchar>(k,j)==obj.id);
             obj.area = area_accurate;
         }
-        instance_category_area_map.insert(std::make_pair(obj.id, std::make_pair(obj.category, obj.area)));
-        // instance_area_pairs.insert(std::pair<int,int>(obj.id, obj.area));
-                          
+        instance_category_area_map.insert(std::make_pair(obj.id, std::make_pair(obj.category, obj.area)));   
         objects.push_back(obj);
     }
     // Process semantic segmentation result
     int sem_num = seg_result.sem_id.size();
     for (int i = 0; i < sem_num; i++)
     {
-        // if (seg_result.sem_area[i] < 5000)
-        //     continue;
-        for (int j = 0; j < sem_lib.size(); j++)
-        {
-            if (find(sem_lib[j].category_id.begin(), sem_lib[j].category_id.end(), seg_result.sem_category[i])!=sem_lib[j].category_id.end())
-            {
-                Sem2D sem = Sem2D();
-                sem.id = seg_result.sem_id[i];
-                // sem.category = seg_result.sem_category[i];
-                sem.category = sem_lib[j].category_id.back();  // Assign all related semantics the same label
-                sem.area = seg_result.sem_area[i];
-                sem.color = sem_lib[j].color;
-                sem.cate_name = sem_lib[j].name;
-                semantics.push_back(sem);
-                semantics_category_area_map.insert(std::make_pair(sem.id, std::make_pair(sem.category, sem.area)));
-                // semantics_category_pairs.insert(std::pair<int,int>(sem.id, sem.category));
-                break;
-            }
-        }     
+        int cate_id = seg_result.sem_category[i];
+        auto it = std::find_if(pano_class_lib.begin(), pano_class_lib.end(),
+            [=] (const PanoClass& f) { return (std::find(f.category_id.begin(), f.category_id.end(),cate_id) != f.category_id.end()); });
+        if (it == pano_class_lib.end())
+            continue;
+
+        Sem2D sem = Sem2D();
+        sem.id = seg_result.sem_id[i];
+        sem.category = seg_result.sem_category[i];
+        sem.area = seg_result.sem_area[i];
+        sem.color = it->color;
+        sem.cate_name = it->name;
+        semantics.push_back(sem);
+        semantics_category_area_map.insert(std::make_pair(sem.id, std::make_pair(sem.category, sem.area)));
     }
 }
 
@@ -538,17 +533,15 @@ void PCSegGeneratorNode::LabelPC ()
         }
         
         // Extract instances that are not segmented geometrically
-        std::pair<int, int> max_candidate = std::make_pair(0,80);
+        std::pair<int, int> max_candidate = std::make_pair(0, background_label);
         int max_count = 0;
         std::unordered_map<int, std::pair<int, pcl::PointCloud<PointSurfelLabel>::Ptr>> extracted_instances;
-        // std::vector<std::pair<int, int>> extracted_instances = {};
-        // std::vector<pcl::PointCloud<PointSurfelLabel>::Ptr> extract_clouds = {};
         for (auto map_it = candidate_pairs.begin(); map_it != candidate_pairs.end(); map_it++)
         {
             auto object_it = instance_category_area_map.find(map_it->first);
             if (object_it != instance_category_area_map.end())
             {
-                if (use_direct_fusion && (map_it->second > 0.95 * object_it->second.second) && (map_it->second < 0.5 * sum_count)) 
+                if (use_direct_fusion && (map_it->second > 0.99 * object_it->second.second)) 
                 // && (map_it->second < 0.5 * sum_count))
                 {
                     pcl::PointCloud<PointSurfelLabel>::Ptr extract_cloud (new pcl::PointCloud<PointSurfelLabel>);                    
@@ -558,7 +551,6 @@ void PCSegGeneratorNode::LabelPC ()
                     extract_cloud->sensor_orientation_.x () = 1.0f;
                     extract_cloud->sensor_orientation_.y () = 0.0f;
                     extract_cloud->sensor_orientation_.z () = 0.0f; 
-                    // extract_clouds.push_back(extract_cloud); 
                     extracted_instances.insert(std::make_pair(object_it->first, std::make_pair(object_it->second.first, extract_cloud)));
 
                     sum_count -= map_it->second;
@@ -577,45 +569,27 @@ void PCSegGeneratorNode::LabelPC ()
             auto semantics_it = semantics_category_area_map.find(map_it->first);
             if (semantics_it != semantics_category_area_map.end())
             {
-                // if (use_direct_fusion && (map_it->second > 0.6 * semantics_it->second.second))
-                // // && (map_it->second < 0.5 * sum_count))
-                // {
-                //     pcl::PointCloud<PointSurfelLabel>::Ptr extract_cloud (new pcl::PointCloud<PointSurfelLabel>);                    
-                //     extract_cloud->is_dense = false;
-                //     extract_cloud->sensor_origin_.setZero ();
-                //     extract_cloud->sensor_orientation_.w () = 0.0f;
-                //     extract_cloud->sensor_orientation_.x () = 1.0f;
-                //     extract_cloud->sensor_orientation_.y () = 0.0f;
-                //     extract_cloud->sensor_orientation_.z () = 0.0f; 
-                //     // extract_clouds.push_back(extract_cloud); 
-                //     extracted_instances.insert(std::make_pair(semantics_it->first, std::make_pair(semantics_it->second.first, extract_cloud)));
-
-                //     sum_count -= map_it->second;
-                // }
-                // else
-                // {
-                    if (map_it->second > max_count)
-                    {
-                        max_candidate = std::make_pair(semantics_it->first, semantics_it->second.first);
-                        max_count = map_it->second;
-                    }     
-                    
-                // }                
+                if (map_it->second > max_count)
+                {
+                    max_candidate = std::make_pair(semantics_it->first, semantics_it->second.first);
+                    max_count = map_it->second;
+                }                  
             }
         }
 
         // If the number of label with maximum counts still too small, assign to background
         if (max_count < 0.2 * sum_count)
-            max_candidate = std::make_pair(0,80);
+            max_candidate = std::make_pair(0, background_label);
 
         // Remove clouds for moving objects
-        if (std::find(mov_list.begin(),mov_list.end(),max_candidate.first) != mov_list.end())
+        if (std::find(mov_list.begin(), mov_list.end(), max_candidate.first) != mov_list.end())
         {
             clouds.erase(cloud_it);
             continue;
         }
 
-        // Separate extracted instances and assign labels to the original segment and others
+        int mapped_semantic_id = GetMappedSemanticLabel(max_candidate.second);
+        // Separate extracted instances and assign labels to all per-frame segments
         float bad_point = std::numeric_limits<float>::quiet_NaN ();
         if (extracted_instances.size() > 0)
         {
@@ -630,14 +604,14 @@ void PCSegGeneratorNode::LabelPC ()
                     PointSurfelLabel pt;
                     pcl::copyPoint((*cloud_it)->points[j], pt);
                     pt.instance_label = (uint8_t)(it->first);
-                    pt.semantic_label = (uint8_t)(it->second.first);
+                    pt.semantic_label = GetMappedSemanticLabel(it->second.first);
                     it->second.second->push_back(pt);
                     (*cloud_it)->points[j].x = (*cloud_it)->points[j].y = (*cloud_it)->points[j].z = bad_point;
                 }
                 else
                 {
                     (*cloud_it)->points[j].instance_label = (uint8_t)(max_candidate.first);
-                    (*cloud_it)->points[j].semantic_label = (uint8_t)(max_candidate.second);
+                    (*cloud_it)->points[j].semantic_label = (uint8_t)(mapped_semantic_id);
                 }     
             }
             std::vector<int> map;
@@ -652,7 +626,7 @@ void PCSegGeneratorNode::LabelPC ()
                     extracted_instances.erase(inst_it);
             }
             // Append clouds of extra extracted instance to the list
-            for (auto instance: extracted_instances)
+            for (auto& instance: extracted_instances)
                 extra_clouds.push_back(instance.second.second);
         }
         else
@@ -660,13 +634,12 @@ void PCSegGeneratorNode::LabelPC ()
             for (int j = 0; j < (*cloud_it)->points.size(); j++)
             {
                 (*cloud_it)->points[j].instance_label = (uint8_t)(max_candidate.first);
-                (*cloud_it)->points[j].semantic_label = (uint8_t)(max_candidate.second);
+                (*cloud_it)->points[j].semantic_label = (uint8_t)(mapped_semantic_id);
             }
         }
 
         // Organize pairs of instance id and point cloud index (only consider object instances)
-        if ((instance_category_area_map.find(max_candidate.first) != instance_category_area_map.end()) || (max_candidate.second == 122) || (max_candidate.second == 121))
-        // if (instance_category_area_map.find(max_candidate.first) != instance_category_area_map.end())
+        if (std::find(obj_class_id.begin(), obj_class_id.end(), mapped_semantic_id) != obj_class_id.end())
         {
             auto id_it = id_pc_pairs.find(max_candidate.first);
             if (id_it != id_pc_pairs.end())
@@ -677,7 +650,6 @@ void PCSegGeneratorNode::LabelPC ()
                 id_pc_pairs.insert(std::make_pair(max_candidate.first,pc_index));
             }
         }
-
         cloud_it ++;
     }
 
@@ -685,7 +657,7 @@ void PCSegGeneratorNode::LabelPC ()
     if (use_distance_check)
     {
         float radius = 0.05;
-        for (auto id_pc_pair: id_pc_pairs)
+        for (auto& id_pc_pair: id_pc_pairs)
         {
             int size = id_pc_pair.second.size();
             if (size > 1)
@@ -781,9 +753,7 @@ void PCSegGeneratorNode::LabelPC ()
                     }
                     else
                         outlier.insert(current_cluster.begin(), current_cluster.end());          
-                }
-                // std::cout << "inlier size++++++++++ " << inlier.size() <<std::endl;
-                // std::cout << "inlier point size++++++++++ " << (inst_id_it->second[*(inlier.begin())]->points.size()) <<std::endl;      
+                }   
                 
                 // For outlier, assign background label
                 if (clusters.size() > 1)
@@ -795,7 +765,7 @@ void PCSegGeneratorNode::LabelPC ()
                         for (int p = 0; p < id_pc_pair.second[out]->points.size(); p++)
                         {
                             id_pc_pair.second[out]->points[p].instance_label = 0u;
-                            id_pc_pair.second[out]->points[p].semantic_label = 80u;
+                            id_pc_pair.second[out]->points[p].semantic_label = background_label;
                         }
                     }
                 }  
@@ -805,86 +775,86 @@ void PCSegGeneratorNode::LabelPC ()
         
     // Append clouds of extra extracted instance to the final list
     for (int p = 0; p < extra_clouds.size(); p++)
-        if ((extra_clouds[p])->points.size() > 400)
-            clouds.push_back(extra_clouds[p]);
+        // if ((extra_clouds[p])->points.size() > 400)
+        clouds.push_back(extra_clouds[p]);
 
-    cv::Mat seg_img(height, width, CV_8UC3, cv::Scalar(0, 0, 0));
-
-    for (int i = 0; i < clouds.size(); i++)
+    // Visualize / save segmentation image
+    if (visualize_fusion_seg || save_img)
     {
-        int semantic_label = (int)clouds[i]->points[0].semantic_label;
-        int instance_label = (int)clouds[i]->points[0].instance_label;
-        for (int j = 0; j < clouds[i]->points.size(); j++)
+        cv::Mat seg_img(height, width, CV_8UC3, cv::Scalar(0, 0, 0));
+        for (int i = 0; i < clouds.size(); i++)
         {
-            int x = (int) (clouds[i]->points[j].x * fx / clouds[i]->points[j].z + cx);
-            int y = (int) (clouds[i]->points[j].y * fy / clouds[i]->points[j].z + cy);
-
-            if (x < 0)
-                x = 0;
-            if (x > width - 2)
-                x = width - 2;
-            if (y < 0)
-                y = 0;
-            if (y > height - 2)
-                y = height - 2;
-
-            auto sem_it = std::find_if(sem_lib.begin(), sem_lib.end(),
-            [=] (const SemClass& f) { return (std::find(f.category_id.begin(), f.category_id.end(), semantic_label) != f.category_id.end()); });
-            if (sem_it != sem_lib.end())
+            int semantic_label = (int)clouds[i]->points[0].semantic_label;
+            int instance_label = (int)clouds[i]->points[0].instance_label;
+            for (int j = 0; j < clouds[i]->points.size(); j++)
             {
-                seg_img.at<cv::Vec3b>(y, x) = sem_it->color;
-                seg_img.at<cv::Vec3b>(y+1, x) = sem_it->color;
-                seg_img.at<cv::Vec3b>(y, x+1) = sem_it->color;
-                seg_img.at<cv::Vec3b>(y+1, x+1) = sem_it->color;
-                continue;
+                int x = (int) (clouds[i]->points[j].x * fx / clouds[i]->points[j].z + cx);
+                int y = (int) (clouds[i]->points[j].y * fy / clouds[i]->points[j].z + cy);
+
+                if (x < 0)
+                    x = 0;
+                if (x > width - 2)
+                    x = width - 2;
+                if (y < 0)
+                    y = 0;
+                if (y > height - 2)
+                    y = height - 2;
+
+                auto sem_it = std::find_if(semantics.begin(), semantics.end(),
+                    [=] (const Sem2D& f) { return (f.id == instance_label); });
+                if (sem_it != semantics.end())
+                {
+                    seg_img.at<cv::Vec3b>(y, x) = sem_it->color;
+                    seg_img.at<cv::Vec3b>(y+1, x) = sem_it->color;
+                    seg_img.at<cv::Vec3b>(y, x+1) = sem_it->color;
+                    seg_img.at<cv::Vec3b>(y+1, x+1) = sem_it->color;
+                    continue;
+                }
+
+                auto obj_it = std::find_if(objects.begin(), objects.end(),
+                    [=] (const Obj2D& f) { return (f.id == instance_label); });
+                if (obj_it != objects.end())
+                {
+                    seg_img.at<cv::Vec3b>(y, x) = obj_it->color;
+                    seg_img.at<cv::Vec3b>(y+1, x) = obj_it->color;
+                    seg_img.at<cv::Vec3b>(y, x+1) = obj_it->color;
+                    seg_img.at<cv::Vec3b>(y+1, x+1) = obj_it->color;
+                    continue;
+                }
+
+                seg_img.at<cv::Vec3b>(y, x) = {200, 200, 200};
+                seg_img.at<cv::Vec3b>(y+1, x) = {200, 200, 200};
+                seg_img.at<cv::Vec3b>(y, x+1) = {200, 200, 200};
+                seg_img.at<cv::Vec3b>(y+1, x+1) = {200, 200, 200};
+
             }
-
-            auto obj_it = std::find_if(objects.begin(), objects.end(),
-            [=] (const Obj2D& f) { return (f.id == instance_label); });
-            if (obj_it != objects.end())
-            {
-                seg_img.at<cv::Vec3b>(y, x) = obj_it->color;
-                seg_img.at<cv::Vec3b>(y+1, x) = obj_it->color;
-                seg_img.at<cv::Vec3b>(y, x+1) = obj_it->color;
-                seg_img.at<cv::Vec3b>(y+1, x+1) = obj_it->color;
-                continue;
-            }
-
-            seg_img.at<cv::Vec3b>(y, x) = {200, 200, 200};
-            seg_img.at<cv::Vec3b>(y+1, x) = {200, 200, 200};
-            seg_img.at<cv::Vec3b>(y, x+1) = {200, 200, 200};
-            seg_img.at<cv::Vec3b>(y+1, x+1) = {200, 200, 200};
-
         }
-    }
-    if (visualize_fusion_seg) 
-    {
-        static const std::string kWindowName = "FusionSeg";
-        cv::namedWindow(kWindowName, cv::WINDOW_NORMAL);
-        cv::resizeWindow(kWindowName, 480, 360);
-        cv::imshow(kWindowName, seg_img);
-        cv::waitKey(1);
-    }
-    if (save_img)
-    {
-        std::string path = ros::package::getPath("perception_ros");
+
         cv::Mat seg_img_save = seg_img.clone();
         cv::cvtColor(seg_img_save, seg_img_save, CV_RGB2BGR);  // opencv uses bgr as default
-        cv::imwrite(path + "/image/fusion/" + std::to_string(NFrame)+".jpg",seg_img_save);
+        if (visualize_fusion_seg) 
+        {
+            static const std::string kWindowName = "FusionSeg";
+            cv::namedWindow(kWindowName, cv::WINDOW_NORMAL);
+            cv::resizeWindow(kWindowName, 480, 360);
+            cv::imshow(kWindowName, seg_img_save);
+            cv::waitKey(1);
+        }
+        if (save_img)
+        {
+            makePath(output_folder + "/image/fusion/", 0777);
+            cv::imwrite(output_folder + "/image/fusion/" + std::to_string(NFrame)+".jpg",seg_img_save);
+        }
     }
-
-
-        
 }
 
 
-cv::Mat PCSegGeneratorNode::DrawInstSeg()
+cv::Mat PCSegGeneratorNode::DrawPanoSeg()
 {
-    // cv::Mat inst_seg_img = imRGB.clone();
     int height = imRGB.rows;
     int width = imRGB.cols;
 
-    cv::Mat inst_seg_img(height, width, CV_8UC3, cv::Scalar(200, 200, 200));
+    cv::Mat pano_seg_img(height, width, CV_8UC3, cv::Scalar(200, 200, 200));
 
     for (int m = 0; m < semantics.size(); m++)
     {
@@ -894,7 +864,7 @@ cv::Mat PCSegGeneratorNode::DrawInstSeg()
             for (int j = 0; j < height; j++)
             {
                 if (imSeg.at<uchar>(j,i) == (uint8_t)semantics[m].id)
-                    inst_seg_img.at<cv::Vec3b>(j,i) = color;
+                    pano_seg_img.at<cv::Vec3b>(j,i) = color;
             }
         }
     }
@@ -903,7 +873,7 @@ cv::Mat PCSegGeneratorNode::DrawInstSeg()
     {
         cv::Rect box = objects[k].box;
         cv::Vec3b color = objects[k].color;
-        cv::rectangle(inst_seg_img, box, color,3);
+        cv::rectangle(pano_seg_img, box, color,3);
     
         for (int i = box.x; i < box.x+box.width; i++)
         {
@@ -911,9 +881,9 @@ cv::Mat PCSegGeneratorNode::DrawInstSeg()
             {
                 if (imSeg.at<uchar>(j,i) == (uint8_t)objects[k].id)
                 {
-                    inst_seg_img.at<cv::Vec3b>(j,i) = color;
+                    pano_seg_img.at<cv::Vec3b>(j,i) = color;
                     if (objects[k].is_dynamic)
-                        inst_seg_img.at<cv::Vec3b>(j,i) = {255,0,0};
+                        pano_seg_img.at<cv::Vec3b>(j,i) = {255,0,0};
                 }
             }
         }  
@@ -932,26 +902,40 @@ cv::Mat PCSegGeneratorNode::DrawInstSeg()
         cv::Point anchor(box.x,box.y-10);
         if (anchor.x+text_size.width > width)
         anchor.x = width - text_size.width - 2;
-        cv::putText(inst_seg_img, text, anchor, cv::FONT_HERSHEY_COMPLEX_SMALL, 0.8, cv::viz::Color::green(), 1.8, cv::LINE_AA);
+        cv::putText(pano_seg_img, text, anchor, cv::FONT_HERSHEY_COMPLEX_SMALL, 0.8, cv::viz::Color::green(), 1.8, cv::LINE_AA);
     }
 
-    if (visualize_pano_seg) 
+    if (visualize_pano_seg || save_img) 
     {
-        static const std::string kWindowName = "PanoSeg";
-        cv::namedWindow(kWindowName, cv::WINDOW_NORMAL);
-        cv::resizeWindow(kWindowName, 480, 360);
-        cv::imshow(kWindowName, inst_seg_img);
-        cv::waitKey(1);
-    }
-    if (save_img)
-    {
-        std::string path = ros::package::getPath("perception_ros");
-        cv::Mat inst_seg_img_save = inst_seg_img.clone();
-        cv::cvtColor(inst_seg_img_save, inst_seg_img_save, CV_RGB2BGR);  // opencv uses bgr as default
-        cv::imwrite(path + "/image/pano_seg/" + std::to_string(NFrame)+".jpg",inst_seg_img_save);
+        cv::Mat pano_seg_img_save = pano_seg_img.clone();
+        cv::cvtColor(pano_seg_img_save, pano_seg_img_save, CV_RGB2BGR);  // opencv uses bgr as default
+        if(visualize_pano_seg)
+        {
+            static const std::string kWindowName = "PanoSeg";
+            cv::namedWindow(kWindowName, cv::WINDOW_NORMAL);
+            cv::resizeWindow(kWindowName, 480, 360);
+            cv::imshow(kWindowName, pano_seg_img_save);
+            cv::waitKey(1);
+        }
+        if (save_img)
+        {
+            makePath(output_folder + "/image/pano_seg/", 0777);
+            cv::imwrite(output_folder + "/image/pano_seg/" + std::to_string(NFrame)+".jpg", pano_seg_img_save);
+        }
     }
     
-    return inst_seg_img;
+    return pano_seg_img;
+}
+
+
+int PCSegGeneratorNode::GetMappedSemanticLabel(int label_in)
+{
+    if ((uchar)label_in == background_label)
+        return label_in;
+    else if (class_id_mapping.find(label_in) != class_id_mapping.end())
+        return class_id_mapping[label_in];
+    else
+        ROS_ERROR("Semantic label not recorded in class_id_mapping!");
 }
 
 }

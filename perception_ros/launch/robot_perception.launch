@@ -1,55 +1,40 @@
 <launch>
-   
-    <arg name="use_vrep" default="false" /> 
-    <!-- <arg name="check_dynamic" default="false" />    -->
-    <arg name="pub_point_cloud" default="false" />   
+    
+    <arg name="output_folder" default="$(find perception_ros)/output/test" />
+    <arg name="flip_depth" default="false" />  <!--depth rendered by vrep(coppeliasim) is flipped-->>
+    <arg name="pub_point_cloud_seg" default="false" />   
     <arg name="camera_frame" default="camera_link" />  
     <arg name="use_GT_mapping" default="false" /> 
+    <arg name="save_img" default="false" /> 
 
-    <arg name="enable_openpose" default="false" />
     <arg name="enable_detectron" default="true" />
     <arg name="detectron_model" default="Pano_seg" />
 
     <arg name="rgb_raw_topic" default="camera/rgb/image_color" />
     <arg name="depth_raw_topic" default="camera/depth_registered/image" />
     <arg name="rgb_info_topic" default="camera/rgb/camera_info" />
-    <arg name="depth_info_topic" default="camera/depth/camera_info" />
-    <!-- <arg name="depth_register_topic" value="camera/depth_registered/image" /> -->
-
-    <arg name="use_semantic_segmentation" default="true" />
-    <arg name="use_geometric_segmentation" default="true" />
 
     <node name="robot_perception_node" pkg="perception_ros" type="perception_node.py" output="screen">
         <remap from="/camera/rgb/image_raw" to="$(arg rgb_raw_topic)"/>
         <remap from="/camera/depth/image_raw" to="$(arg depth_raw_topic)"/>
         <remap from="/camera/rgb/camera_info" to="$(arg rgb_info_topic)"/>
-        <remap from="/camera/depth/camera_info" to="$(arg depth_info_topic)"/>
-        <!-- <remap from="/camera/depth_registered/image" to="$(arg depth_register_topic)"/> -->
+        <!-- <remap from="/camera/depth/camera_info" to="$(arg depth_info_topic)"/> -->
 
-        <param name="use_vrep" type="bool" value="$(arg use_vrep)"/>
-        <!-- <param name="check_dynamic" type="bool" value="$(arg check_dynamic)"/> -->
-        <param name="enable_openpose" type="bool" value="$(arg enable_openpose)" />
-        <param name="openpose_ip" type="str" value="192.168.1.139"/>
-        <param name="openpose_port" type="int" value="8800"/>
+        <param name="flip_depth" type="bool" value="$(arg flip_depth)"/>
         <param name="enable_detectron" type="bool" value="$(arg enable_detectron)" />
         <param name="detectron_ip" type="str" value="192.168.1.139"/>
         <param name="detectron_port" type="int" value="8801"/>
         <param name="detectron_model" type="str" value="$(arg detectron_model)"/>
     </node>
 
-    <node name="pc_seg_generator_node" pkg="perception_ros" type="pc_seg_generator_node" output="screen" if="$(arg pub_point_cloud)">
+    <node name="pc_seg_generator_node" pkg="perception_ros" type="pc_seg_generator_node" output="screen" if="$(arg pub_point_cloud_seg)">
         <rosparam command="load" file="$(find perception_ros)/cfg/seg_param.yaml" />
-        <param name="use_semantic_segmentation" type="bool" value="$(arg use_semantic_segmentation)" />
-        <param name="use_geometric_segmentation" type="bool" value="$(arg use_geometric_segmentation)" />
-        <param name="use_distance_check" type="bool" value="true" />
-        <param name="use_direct_fusion" type="bool" value="true" />
+        <rosparam command="load" file="$(find perception_ros)/cfg/pc_gen_param.yaml" />
+        <rosparam command="load" file="$(find perception_ros)/cfg/pano_class.yaml" />
+
+        <param name="output_folder" type="string" value="$(arg output_folder)" />
         <param name="use_GT_camera_frame" type="bool" value="$(arg use_GT_mapping)" />
         <param name="camera_frame" type="string" value="$(arg camera_frame)" />
-        <param name="geo_seg_mode" type="int" value="0" />  <!--0 for depth and 1 for point cloud-->>
-        <param name="visualize_geo_seg" type="bool" value="false" />
-        <param name="visualize_pano_seg" type="bool" value="false" />
-        <param name="visualize_fusion_seg" type="bool" value="false" />
-        <param name="pub_seg_img" type="bool" value="true" />
-        <param name="save_img" type="bool" value="false" />
+        <param name="save_img" type="bool" value="$(arg save_img)" />
     </node>
 </launch>

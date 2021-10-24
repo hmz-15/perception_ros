@@ -42,6 +42,8 @@
 namespace PerceptionROS
 {
 
+extern uchar background_label;
+
 struct LCCPParam{
     // Supervoxel stuff
     float voxel_resolution = 0.008f;
@@ -90,7 +92,7 @@ class PCProcessor
 {
 
 public:
-    PCProcessor(ros::NodeHandle& node_handle,  bool visualize_geo_seg, bool save_img);
+    PCProcessor(ros::NodeHandle& node_handle,  bool visualize_geo_seg);
     ~PCProcessor(){};
 
     void SetCamIntrinsics(const cv::Mat& K);
@@ -119,7 +121,6 @@ private:
     cv::Mat K_;
 
     bool if_visualize;
-    bool if_save_img;
     bool if_first_time = true;
 
     pcl::visualization::PCLVisualizer::Ptr viewer;

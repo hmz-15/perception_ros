@@ -22,7 +22,7 @@
 
         <param name="flip_depth" type="bool" value="$(arg flip_depth)"/>
         <param name="enable_detectron" type="bool" value="$(arg enable_detectron)" />
-        <param name="detectron_ip" type="str" value="192.168.1.139"/>
+        <param name="detectron_ip" type="str" value="0.0.0.0"/>
         <param name="detectron_port" type="int" value="8801"/>
         <param name="detectron_model" type="str" value="$(arg detectron_model)"/>
     </node>

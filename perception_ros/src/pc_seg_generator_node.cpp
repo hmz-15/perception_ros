@@ -121,7 +121,7 @@ PCSegGeneratorNode::PCSegGeneratorNode(ros::NodeHandle& node_handle): node_handl
     }
 
     // camera info subscriber
-    info_sub_ = node_handle_.subscribe("/perception/rgb_info", 5, &PCSegGeneratorNode::CamInfoCallback, this);
+    info_sub_ = node_handle_.subscribe("/perception/camera_info", 5, &PCSegGeneratorNode::CamInfoCallback, this);
 
     point_cloud_segment_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>("/perception/seg_point_cloud", 100);
     pano_seg_image_publisher_ = node_handle_.advertise<sensor_msgs::Image>("/perception/pano_seg", 100);

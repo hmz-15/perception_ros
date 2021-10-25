@@ -33,17 +33,15 @@ class PerceptionNode(object):
 
         self.rgb_sub_ = Subscriber('/camera/rgb/image_raw', Image)
         self.depth_sub_ = Subscriber('/camera/depth/image_raw', Image)
-        self.rgb_info_sub_ = Subscriber('/camera/rgb/camera_info', CameraInfo)
-        self.depth_info_sub_ = Subscriber('/camera/depth/camera_info', CameraInfo)
+        self.camera_info_sub_ = Subscriber('/camera/rgb/camera_info', CameraInfo)
 
-        self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.rgb_info_sub_], queue_size=10, slop=0.2)
+        self.syn_sub_ = ApproximateTimeSynchronizer([self.rgb_sub_, self.depth_sub_, self.camera_info_sub_], queue_size=10, slop=0.2)
         self.syn_sub_.registerCallback(self.perceive_)
 
         self.dt_pub = rospy.Publisher("/perception/seg", Seg, queue_size=1)
         self.rgb_pub = rospy.Publisher("/perception/rgb_image", Image, queue_size=1)
         self.depth_pub = rospy.Publisher("/perception/depth_image", Image, queue_size=1)
-        self.rgb_info_pub = rospy.Publisher("/perception/rgb_info", CameraInfo, queue_size=1)
-        self.depth_info_pub = rospy.Publisher("/perception/depth_info", CameraInfo, queue_size=1)
+        self.camera_info_pub = rospy.Publisher("/perception/camera_info", CameraInfo, queue_size=1)
 
         self.tf_listener_ = tf.TransformListener()
 
@@ -51,7 +49,7 @@ class PerceptionNode(object):
 
         self.rgb_image_ = None
         self.depth_image_ = None
-        self.rgb_info_ = None
+        self.camera_info_ = None
         self.depth_info_ = None
         self.flag_ = False  # if new message comes
 
@@ -63,7 +61,7 @@ class PerceptionNode(object):
     def launch(self):
         while not rospy.is_shutdown():
             
-            if not self.rgb_image_ == None and self.flag_:
+            if self.rgb_image_ is not None and self.flag_:
                 self.flag_ = False
                 # start = rospy.get_time()
 
@@ -80,12 +78,12 @@ class PerceptionNode(object):
                 # print(end-start)
 
     
-    def perceive_(self, rgb_img, depth_img, rgb_info):
+    def perceive_(self, rgb_img, depth_img, camera_info):
         # print("percieve")
             
         self.rgb_image_ = rgb_img
         self.depth_image_ = depth_img
-        self.rgb_info_ = rgb_info
+        self.camera_info_ = camera_info
 
         if self.flip_depth_:
             dep_img = self.bridge_.imgmsg_to_cv2(depth_img, desired_encoding="16UC1")
@@ -102,7 +100,7 @@ class PerceptionNode(object):
 
         # Publish frame
         self.rgb_pub.publish(rgb_img)
-        self.rgb_info_pub.publish(rgb_info)
+        self.camera_info_pub.publish(camera_info)
 
         if self.flip_depth_:
             self.depth_pub.publish(depth_flip_img_)
@@ -187,9 +185,6 @@ if __name__ == "__main__":
     detectron_ip = rospy.get_param("~detectron_ip", "0.0.0.0")
     detectron_port = rospy.get_param("~detectron_port", 8801)
     detectron_model = rospy.get_param("~detectron_model", "Pano_seg")
-
-    print(enable_detectron)
-    print(detectron_model)
 
     node = PerceptionNode(
         flip_depth=flip_depth,

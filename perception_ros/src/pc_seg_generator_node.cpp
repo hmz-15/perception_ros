@@ -541,7 +541,7 @@ void PCSegGeneratorNode::LabelPC ()
             auto object_it = instance_category_area_map.find(map_it->first);
             if (object_it != instance_category_area_map.end())
             {
-                if (use_direct_fusion && (map_it->second > 0.99 * object_it->second.second)) 
+                if (use_direct_fusion && (map_it->second > 0.9 * object_it->second.second)) 
                 // && (map_it->second < 0.5 * sum_count))
                 {
                     pcl::PointCloud<PointSurfelLabel>::Ptr extract_cloud (new pcl::PointCloud<PointSurfelLabel>);                    

@@ -45,7 +45,7 @@ The node is implemented in `scripts/perception_node.py`. The node has two functi
 
 - **Image processing** : take in ROS topics of RGB image, depth image and camera info), and output processed topics
 
-- **Segmentation request** : send RGB images to a [python3-based image segmentation server]() and receive results via TCP communication, unpack the results and publish as `seg_msgs`
+- **Segmentation request** : send RGB images to a [python3-based image segmentation server](https://github.com/hmz-15/Interactive-Scene-Reconstruction/tree/main/mapping/rp_server) and receive results via TCP communication, unpack the results and publish as `seg_msgs`
 
 
 ## 3. pc_seg_generator_node

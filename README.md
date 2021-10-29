@@ -15,7 +15,6 @@ The perception_ros package contains two ROS nodes:
 
 ## 1. Usage
 
----
 ### 1.1 Dependencies
 
 - Ubuntu 16.04 (ROS Kinetic) or 18.04 (ROS Melodic) or Ubuntu 20.04 (ROS noetic)
@@ -40,16 +39,16 @@ roslaunch perception_ros robot_perception.launch
 ```
 
 ## 2. perception_node
----
+
 The node is implemented in `scripts/perception_node.py`. The node has two functions:
 
 - **Image processing** : take in ROS topics of RGB image, depth image and camera info), and output processed topics
 
-- **Segmentation request** : send RGB images to a [python3-based image segmentation server]() and receive results via TCP communication, unpack the results and publish as `seg_msgs`
+- **Segmentation request** : send RGB images to a [python3-based image segmentation server](https://github.com/hmz-15/Interactive-Scene-Reconstruction/tree/main/mapping/rp_server) and receive results via TCP communication, unpack the results and publish as `seg_msgs`
 
 
 ## 3. pc_seg_generator_node
----
+
 The node is implemented in `src/pc_seg_generator_node.cpp`. It is majorly designed for generating per-frame point cloud segments in various ways given RGBD streams and the predicted segmentation results (mostly panoptic segmentation) published by `perception_node`. Some provided features are listed below:
 
 - **depth segmentation** : in `src/depth_segmentation.cc` , adapted from the [ETH depth segmentation package](https://github.com/ethz-asl/depth_segmentation) with config file `cfg/seg_param.yaml`

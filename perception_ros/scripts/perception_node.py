@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import rospy
-import tf
 import numpy as np
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
@@ -42,8 +41,6 @@ class PerceptionNode(object):
         self.rgb_pub = rospy.Publisher("/perception/rgb_image", Image, queue_size=1)
         self.depth_pub = rospy.Publisher("/perception/depth_image", Image, queue_size=1)
         self.camera_info_pub = rospy.Publisher("/perception/camera_info", CameraInfo, queue_size=1)
-
-        self.tf_listener_ = tf.TransformListener()
 
         self.bridge_ = CvBridge()
 
